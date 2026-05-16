@@ -1,7 +1,8 @@
 import numpy as np
 
-from environment import Receiver, Router, Sender
-
+from .receiver import Receiver
+from .router import Router
+from .sender import Sender
 
 class TCP:
     def __init__(self):

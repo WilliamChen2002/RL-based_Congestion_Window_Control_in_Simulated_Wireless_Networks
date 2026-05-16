@@ -24,4 +24,7 @@ dependencies = [
     "numpy>=2.4.5",
     "pytest>=9.0.3",
     "ruff>=0.15.12",
+    "torch",
+    "gymnasium>=0.29",
+    "stable-baselines3>=2.3",
 ]

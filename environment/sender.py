@@ -1,5 +1,4 @@
-from environment import Packet
-
+from .packet import Packet
 
 class Sender:
     def __init__(self):
