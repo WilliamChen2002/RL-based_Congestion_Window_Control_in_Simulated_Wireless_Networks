@@ -1,4 +1,3 @@
-
 **專題名稱**
 
 RL-based Congestion Window Control in Simulated Wireless Networks
@@ -16,7 +15,7 @@ Agent（自我進化型 Agent）
 
 **系統架構設計圖（含模組劃分）**
 
-![]()![1778396647304](image/README/1778396647304.png)
+![]()![structure](image/README/structure.png)
 
 實驗環境，模擬簡化版的TCP網路環境，包含：頻寬（Bandwidth）、RTT、Packet
 Loss、Queue Length與AoI等。
