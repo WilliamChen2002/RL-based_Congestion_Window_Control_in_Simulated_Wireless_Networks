@@ -3,7 +3,7 @@ import random
 from environment import TCPEnv
 
 
-def run_simulation(mode):
+def run_simulation(mode, type=None, action=None, cwnd=None):
 
     print(f"\n===== {mode.upper()} =====\n")
 
@@ -14,11 +14,17 @@ def run_simulation(mode):
     done = False
 
     while not done:
-        # RL only
         action = None
-
+        # Agent更改部分
         if mode == "agent":
-            action = random.choice([0, 1, 2])
+            if type == "DQN":
+                # Agent選擇的部分(DQN)
+                action = 1
+                # action = random.choice([0, 1, 2])
+            if type == "DDPG":
+                # DDPG
+                action = cwnd
+                # action = random.randint(1, 20)
 
         next_state, reward, done, info = env.step(action)
 
@@ -48,6 +54,11 @@ def run_simulation(mode):
 if __name__ == "__main__":
     # run_simulation("reno")
 
-    run_simulation("cubic")
+    # run_simulation("cubic")
 
-    # run_simulation("agent")
+    # 這行是給DQN用的 action 是你 agent 選擇的動作 action，動作跟上一版相同等待討論5/23
+    # run_simulation("agent", "DQN", action=agent_action, cwnd=None)
+    # 這行是給DDPG用的 cwnd 是你 agent 輸出的cwnd值
+    # run_simulation("agent", "DDPG", action=2, cwnd=agent_cwnd)
+
+    run_simulation("agent", "DDPG", action=None, cwnd=5)

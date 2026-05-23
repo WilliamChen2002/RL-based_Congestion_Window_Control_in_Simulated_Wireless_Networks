@@ -39,15 +39,16 @@ class TCPEnv:
             dtype=np.float32,
         )
 
-    def step(self, action=None):
+    def step(self, action=None, cwnd=None):
 
         self.time += 1
 
         self.step_count += 1
 
         # sender
-        if self.mode == "rl":
+        if self.mode == "agent":
             self.sender.apply(action)
+            self.sender.apply(cwnd)
 
         packets = self.sender.send(self.time)
 
