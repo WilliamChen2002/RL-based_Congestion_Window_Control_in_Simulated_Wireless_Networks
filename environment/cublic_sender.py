@@ -6,21 +6,19 @@ class CubicSender(BaseSender):
 
         super().__init__()
 
+        self.Wmax = self.cwnd
+
+        self.t = 0
+
         self.C = 0.4
 
         self.beta = 0.7
 
-        self.Wmax = self.cwnd
+    def on_ack(self, ack):
 
-        self.epoch_time = 0
+        self.t += 1
 
-    def on_ack(self, ack_count):
-
-        self.epoch_time += 1
-
-        K = ((self.Wmax * (1 - self.beta)) / self.C) ** (1 / 3)
-
-        self.cwnd = self.C * ((self.epoch_time - K) ** 3) + self.Wmax
+        self.cwnd = self.C * (self.t**3) + self.Wmax
 
         self.cwnd = max(1.0, self.cwnd)
 
@@ -30,6 +28,4 @@ class CubicSender(BaseSender):
 
         self.cwnd *= self.beta
 
-        self.cwnd = max(1.0, self.cwnd)
-
-        self.epoch_time = 0
+        self.t = 0

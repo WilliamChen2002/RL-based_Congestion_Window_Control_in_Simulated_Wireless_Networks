@@ -14,25 +14,21 @@ class BaseSender(ABC):
 
         self.ssthresh = 32.0
 
-        self.next_seq = 0
+        self.seq = 0
 
-    def generate_packets(self, current_time):
+    def send(self, time):
 
         packets = []
 
-        send_num = max(1, int(self.cwnd))
+        for _ in range(int(self.cwnd)):
+            packets.append(Packet(self.seq, time))
 
-        for _ in range(send_num):
-            pkt = Packet(seq_id=self.next_seq, created_time=current_time)
-
-            packets.append(pkt)
-
-            self.next_seq += 1
+            self.seq += 1
 
         return packets
 
     @abstractmethod
-    def on_ack(self, ack_count):
+    def on_ack(self, ack):
         pass
 
     @abstractmethod

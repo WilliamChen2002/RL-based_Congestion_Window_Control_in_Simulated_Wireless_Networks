@@ -3,11 +3,11 @@ import random
 from environment import TCPEnv
 
 
-def run_simulation(sender_type):
+def run_simulation(mode):
 
-    print(f"\n===== {sender_type.upper()} =====\n")
+    print(f"\n===== {mode.upper()} =====\n")
 
-    env = TCPEnv(sender_type=sender_type)
+    env = TCPEnv(mode=mode)
 
     state = env.reset()
 
@@ -17,7 +17,7 @@ def run_simulation(sender_type):
         # RL only
         action = None
 
-        if sender_type == "agent":
+        if mode == "agent":
             action = random.choice([0, 1, 2])
 
         next_state, reward, done, info = env.step(action)

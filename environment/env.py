@@ -1,140 +1,94 @@
 import numpy as np
 from .receiver import Receiver
 from .router import Router
-from .sender import BaseSender
 from .reno_sender import RenoSender
 from .agent_sender import AgentSender
 from .cublic_sender import CubicSender
 
 
 class TCPEnv:
-    def __init__(self, sender_type="reno", max_steps=50):
+    def __init__(self, mode="reno"):
 
-        # sender selection
-        if sender_type == "reno":
+        if mode == "reno":
             self.sender = RenoSender()
 
-        elif sender_type == "cubic":
+        elif mode == "cubic":
             self.sender = CubicSender()
 
-        elif sender_type == "rl":
-            self.sender = AgentSender()
-
         else:
-            raise ValueError("Unknown sender type")
+            self.sender = AgentSender()
 
         self.router = Router()
 
         self.receiver = Receiver()
 
-        self.max_steps = max_steps
-
-        self.current_time = 0
+        self.time = 0
 
         self.step_count = 0
 
-    # ========================================================
-    # reset
-    # ========================================================
+        self.mode = mode
 
     def reset(self):
 
-        sender_type = type(self.sender).__name__
-
-        if sender_type == "RenoSender":
-            self.sender = RenoSender()
-
-        elif sender_type == "CubicSender":
-            self.sender = CubicSender()
-
-        elif sender_type == "AgentSender":
-            self.sender = AgentSender()
-
-        self.router = Router()
-
-        self.receiver = Receiver()
-
-        self.current_time = 0
-
-        self.step_count = 0
-
         return self.get_state()
-
-    # ========================================================
-    # state
-    # ========================================================
 
     def get_state(self):
 
         return np.array(
-            [self.sender.cwnd, len(self.router.queue), self.router.wireless_loss],
+            [self.sender.cwnd, len(self.router.queue), self.router.base_bandwidth],
             dtype=np.float32,
         )
 
-    # ========================================================
-    # step
-    # ========================================================
-
     def step(self, action=None):
 
-        self.current_time += 1
+        self.time += 1
 
         self.step_count += 1
 
-        # RL action
-        if isinstance(self.sender, AgentSender):
-            self.sender.apply_action(action)
+        # sender
+        if self.mode == "rl":
+            self.sender.apply(action)
 
-        # sender sends packets
-        packets = self.sender.generate_packets(current_time=self.current_time)
+        packets = self.sender.send(self.time)
 
-        # router transmission
-        router_result = self.router.transmit(packets)
+        # router
+        r = self.router.transmit(packets, self.time)
 
-        delivered = router_result["delivered"]
+        # receiver
+        ack, aoi = self.receiver.receive(r["delivered"], self.time)
 
-        # receiver ACK + AoI
-        receiver_result = self.receiver.receive(delivered, self.current_time)
+        loss = r["congestion_drop"] + r["wireless_drop"]
 
-        ack_count = receiver_result["ack_count"]
+        total_packets = max(1, len(packets))
 
-        aoi = receiver_result["aoi"]
+        loss_rate = loss / total_packets
 
-        # total loss
-        total_drop = router_result["congestion_drop"] + router_result["wireless_drop"]
+        rtt = 50 + r["queue_delay"] + r["transmit_time"]
 
-        # sender feedback
-        if total_drop > 0:
+        # sender update
+        if loss > 0:
             self.sender.on_loss()
 
         else:
-            self.sender.on_ack(ack_count)
+            self.sender.on_ack(ack)
 
-        # metrics
-        throughput = ack_count
+        throughput = ack
 
-        sent_packets = max(1, len(packets))
-
-        loss_rate = total_drop / sent_packets
-
-        rtt = router_result["rtt"]
-
-        queue_size = len(self.router.queue)
-
-        # reward
+        # ===== reward (KEY UPGRADE) =====
         reward = throughput - 0.1 * rtt - 20 * loss_rate - 0.5 * aoi
 
-        done = self.step_count >= self.max_steps
+        done = self.step_count > 50
 
         info = {
             "throughput": throughput,
             "loss_rate": loss_rate,
             "rtt": rtt,
-            "queue_size": queue_size,
             "aoi": aoi,
+            "queue": len(self.router.queue),
+            "bandwidth": r["bandwidth"],
+            "tx_time": r["transmit_time"],
             "cwnd": self.sender.cwnd,
-            "wireless_drop": router_result["wireless_drop"],
-            "congestion_drop": router_result["congestion_drop"],
+            "queue_size": len(self.router.queue),
         }
 
-        return (self.get_state(), reward, done, info)
+        return self.get_state(), reward, done, info

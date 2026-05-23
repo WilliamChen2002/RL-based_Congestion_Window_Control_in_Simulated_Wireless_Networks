@@ -2,13 +2,7 @@ from .sender import BaseSender
 
 
 class AgentSender(BaseSender):
-    def apply_action(self, action):
-        """
-        action:
-            0 -> decrease
-            1 -> hold
-            2 -> increase
-        """
+    def apply(self, action):
 
         if action == 0:
             self.cwnd *= 0.7
@@ -18,7 +12,7 @@ class AgentSender(BaseSender):
 
         self.cwnd = max(1.0, self.cwnd)
 
-    def on_ack(self, ack_count):
+    def on_ack(self, ack):
         pass
 
     def on_loss(self):
