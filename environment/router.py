@@ -2,15 +2,17 @@ import random
 
 
 class Router:
-    def __init__(self):
+    def __init__(
+        self, bandwidth=20, queue_limit=100, wireless_loss=0.05, base_delay=50
+    ):
 
-        self.bandwidth = 20
+        self.bandwidth = bandwidth
 
-        self.queue_size = 50
+        self.queue_limit = queue_limit
 
-        self.base_delay = 50
+        self.wireless_loss = wireless_loss
 
-        self.wireless_loss = 0.05
+        self.base_delay = base_delay
 
         self.queue = []
 
@@ -18,25 +20,27 @@ class Router:
 
         delivered = []
 
-        dropped = 0
+        congestion_drop = 0
+
+        wireless_drop = 0
 
         # enqueue
         for pkt in packets:
-            if len(self.queue) < self.queue_size:
+            if len(self.queue) < self.queue_limit:
                 self.queue.append(pkt)
 
             else:
-                dropped += 1
+                congestion_drop += 1
 
-        # bandwidth limit
-        transmit_num = min(self.bandwidth, len(self.queue))
+        # transmit
+        send_num = min(self.bandwidth, len(self.queue))
 
-        for _ in range(transmit_num):
+        for _ in range(send_num):
             pkt = self.queue.pop(0)
 
-            # wireless random drop
+            # wireless random loss
             if random.random() < self.wireless_loss:
-                dropped += 1
+                wireless_drop += 1
 
                 continue
 
@@ -46,4 +50,10 @@ class Router:
 
         rtt = self.base_delay + queue_delay
 
-        return delivered, dropped, rtt
+        return {
+            "delivered": delivered,
+            "congestion_drop": congestion_drop,
+            "wireless_drop": wireless_drop,
+            "queue_delay": queue_delay,
+            "rtt": rtt,
+        }

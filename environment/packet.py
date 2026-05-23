@@ -1,7 +1,6 @@
 class Packet:
-    def __init__(self, seq, size=1):
+    def __init__(self, seq_id, created_time):
 
-        self.seq = seq
-        self.size = size
+        self.seq_id = seq_id
 
-        self.dropped = False
+        self.created_time = created_time

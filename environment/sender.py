@@ -1,7 +1,13 @@
-from environment import Packet
+from abc import ABC, abstractmethod
+
+from .packet import Packet
+
+# ============================================================
+# Base Sender
+# ============================================================
 
 
-class Sender:
+class BaseSender(ABC):
     def __init__(self):
 
         self.cwnd = 10.0
@@ -10,29 +16,25 @@ class Sender:
 
         self.next_seq = 0
 
-    def apply_action(self, action):
-
-        # RL action
-
-        if action == 0:
-            self.cwnd *= 0.7
-
-        elif action == 2:
-            self.cwnd *= 1.2
-
-        self.cwnd = max(1.0, self.cwnd)
-
-    def send_packets(self):
+    def generate_packets(self, current_time):
 
         packets = []
 
-        send_num = int(self.cwnd)
+        send_num = max(1, int(self.cwnd))
 
         for _ in range(send_num):
-            pkt = Packet(self.next_seq)
+            pkt = Packet(seq_id=self.next_seq, created_time=current_time)
 
             packets.append(pkt)
 
             self.next_seq += 1
 
         return packets
+
+    @abstractmethod
+    def on_ack(self, ack_count):
+        pass
+
+    @abstractmethod
+    def on_loss(self):
+        pass
