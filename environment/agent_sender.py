@@ -2,8 +2,12 @@ from .sender import BaseSender
 
 
 class AgentSender(BaseSender):
-    def apply(self, action=1, cwnd=None):
-        if cwnd is not None:
+    def apply(self, action=1, cwnd=None, coef=None):
+        if cwnd is not None and coef is not None:
+            self.cwnd = cwnd * coef
+        elif coef is not None:
+            self.cwnd *= coef
+        elif cwnd is not None:
             self.cwnd = cwnd
         else:
             if action == 0:
