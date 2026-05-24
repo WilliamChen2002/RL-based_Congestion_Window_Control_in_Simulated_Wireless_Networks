@@ -1,162 +1,265 @@
-# client.py
-import socket
 import json
-import matplotlib.pyplot as plt
-import random
-from datetime import datetime
 import os
+import random
+import socket
+from datetime import datetime
+
+import matplotlib.pyplot as plt
 
 
+# =========================================================
+# CLEAN RL-STYLE TCP CLIENT (API VERSION)
+# =========================================================
 class TCPEnvClient:
     def __init__(self, host="127.0.0.1", port=8888):
-        self.host = host
-        self.port = port
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.connect((self.host, self.port))
 
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock.connect((host, port))
+
+    # -----------------------------
+    # internal IO
+    # -----------------------------
     def _send(self, data):
-        msg = json.dumps(data) + "\n"
-        self.sock.sendall(msg.encode())
+        self.sock.sendall((json.dumps(data) + "\n").encode())
 
     def _recv(self):
-        data = b""
+        buffer = b""
         while True:
             chunk = self.sock.recv(4096)
-            data += chunk
-            if b"\n" in data:
+            buffer += chunk
+            if b"\n" in buffer:
                 break
-        return json.loads(data.decode().strip())
+        return json.loads(buffer.decode().strip())
 
-    def create_session(self, mode: str, seed: int):
+    # =====================================================
+    # PUBLIC API (FOR AGENT DEVELOPERS)
+    # =====================================================
+
+    def create(self, mode="agent", seed=42):
+        """
+        Create environment session
+        """
         self._send({"command": "create", "mode": mode, "seed": seed})
         return self._recv()
 
     def reset(self, session_id):
+        """
+        Reset environment -> returns initial state
+        """
         self._send({"command": "reset", "session_id": session_id})
-        return self._recv()
 
-    def step(self, session_id, action=None):
+        res = self._recv()
+        return res["state"]
+
+    def step(self, session_id, action):
+        """
+        RL standard interface:
+
+        Returns:
+            obs, reward, done, info
+        """
+
         self._send({"command": "step", "session_id": session_id, "action": action})
-        return self._recv()
+
+        res = self._recv()
+
+        return (res["state"], res["reward"], res.get("done", False), res["info"])
 
     def close(self):
         self.sock.close()
 
 
-def compare_modes(steps=150):
-    # ==================== 建立記錄檔案 ====================
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    os.makedirs("logs", exist_ok=True)
+# =========================================================
+# ACTION WRAPPER (FOR MULTI-AGENT SUPPORT)
+# =========================================================
+def build_action(agent_type, agent, state):
 
-    log_files = {}
-    modes = ["reno", "cubic", "agent"]
+    if agent_type == "dqn":
+        return agent.act(state)  # discrete: 0/1/2
 
-    for mode in modes:
-        filename = f"logs/{timestamp}_{mode.upper()}.txt"
-        log_files[mode] = open(filename, "w", encoding="utf-8")
-        log_files[mode].write(f"=== {mode.upper()} Simulation Log ===\n")
-        log_files[mode].write(f"Timestamp : {datetime.now()}\n")
-        log_files[mode].write(
-            f"Random Seed: {random.randint(1, 100000)}\n"
-        )  # 這裡會在下面覆蓋正確 seed
-        log_files[mode].write("=" * 70 + "\n\n")
+    elif agent_type == "ddpg":
+        return agent.act(state)  # continuous cwnd
 
-    # ==================== 主要模擬流程 ====================
+    elif agent_type == "coef":
+        return agent.act(state)  # scaling factor
+
+    else:
+        return 1
+
+
+# =========================================================
+# EPISODE RUNNER (CLEAN RL LOOP)
+# =========================================================
+def run_episode(client, session_id, agent, agent_type, steps=150):
+
+    state = client.reset(session_id)
+
+    trajectory = []
+
+    for _t in range(steps):
+        # ===== 1. agent action =====
+        action = build_action(agent_type, agent, state)
+
+        # ===== 2. env step =====
+        next_state, reward, done, info = client.step(session_id, action)
+
+        # ===== 3. store transition =====
+        transition = {
+            "state": state,
+            "action": action,
+            "reward": reward,
+            "next_state": next_state,
+            "info": info,
+        }
+
+        trajectory.append(transition)
+
+        # ===== 4. learning hook =====
+        if hasattr(agent, "store"):
+            agent.store(transition)
+
+        if hasattr(agent, "learn"):
+            agent.learn()
+
+        state = next_state
+
+        if done:
+            break
+
+    return trajectory
+
+
+# =========================================================
+# MULTI-MODE EXPERIMENT (RENO / CUBIC / AGENT)
+# =========================================================
+def run_experiment(steps=150):
+
     client = TCPEnvClient()
-    base_seed = random.randint(1, 100000)
-    print(f"使用相同隨機種子: {base_seed}\n")
+
+    modes = ["reno", "cubic", "agent"]
+    seed = 42
 
     sessions = {}
-    results = {mode: {"throughput": [], "aoi": []} for mode in modes}
 
-    # 更新 log 檔頭的 seed
-    for mode in modes:
-        log_files[mode].write(f"Base Seed: {base_seed}\n\n")
-        log_files[mode].write(
-            f"Step    CWND    Throughput    AoI     Loss Rate    Queue\n"
-        )
-        log_files[mode].write("-" * 70 + "\n")
+    results = {
+        m: {
+            "cwnd": [],
+            "throughput": [],
+            "aoi": [],
+            "loss": [],
+        }
+        for m in modes
+    }
 
-    # 建立三個獨立環境
-    for mode in modes:
-        resp = client.create_session(mode, base_seed)
-        sessions[mode] = resp["session_id"]
-        client.reset(sessions[mode])
-        print(f"✅ 已建立 {mode.upper():6} 環境 → logs/{timestamp}_{mode.upper()}.txt")
+    # -----------------------------
+    # create sessions
+    # -----------------------------
+    for m in modes:
+        resp = client.create(mode=m, seed=seed)
+        sid = resp["session_id"]
+        client.reset(sid)
+        sessions[m] = sid
 
-    print("\n開始模擬...\n")
+    print("🚀 simulation start...\n")
 
-    for i in range(steps):
-        for mode in modes:
-            action = 1 if (mode == "agent" and i % 5 < 3) else None
-            result = client.step(sessions[mode], action=action)
-            info = result.get("info", {})
+    # -----------------------------
+    # main loop
+    # -----------------------------
+    for t in range(steps):
+        for m in modes:
+            sid = sessions[m]
 
-            # 儲存到結果（用來畫圖）
-            results[mode]["throughput"].append(info.get("throughput", 0))
-            results[mode]["aoi"].append(info.get("aoi", 0))
+            # ===== simple baseline agent =====
+            if m == "agent":
+                action = random.choice([0, 1, 2])
+            else:
+                action = None
 
-            # 寫入文字檔
-            log_line = (
-                f"{i + 1:4d}    {info.get('cwnd', 0):6.2f}    "
-                f"{info.get('throughput', 0):8.2f}    "
-                f"{info.get('aoi', 0):7.2f}    "
-                f"{info.get('loss_rate', 0):8.3f}    "
-                f"{info.get('queue', 0):5d}\n"
-            )
-            log_files[mode].write(log_line)
+            _, _, _, info = client.step(sid, action)
 
-        # 每 30 step 顯示在畫面
-        if i % 30 == 0:
-            tp = {m: results[m]["throughput"][-1] for m in modes}
-            print(
-                f"Step {i + 1:3d} | Reno: {tp['reno']:.2f} | Cubic: {tp['cubic']:.2f} | Agent: {tp['agent']:.2f}"
-            )
+            results[m]["cwnd"].append(info["cwnd"])
+            results[m]["throughput"].append(info["throughput"])
+            results[m]["aoi"].append(info["aoi"])
+            results[m]["loss"].append(info["loss_rate"])
 
-    # 關閉所有 log 檔案
-    for f in log_files.values():
-        f.close()
+        if t % 30 == 0:
+            print(f"Step {t} done")
 
     client.close()
+    return results
 
-    print(f"\n✅ 模擬完成！三個詳細記錄已儲存至 logs/ 資料夾")
-    print(f"檔案名稱：{timestamp}_(RENO|CUBIC|AGENT).txt\n")
 
-    # ==================== 繪製比較圖 ====================
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10))
+# =========================================================
+# PLOTTING (4 METRICS + COMBINED)
+# =========================================================
+def plot_results(results, steps):
+
     x = range(steps)
+
+    os.makedirs("figures", exist_ok=True)
 
     colors = {"reno": "blue", "cubic": "green", "agent": "red"}
 
-    for mode in modes:
-        ax1.plot(
-            x,
-            results[mode]["throughput"],
-            label=mode.upper(),
-            color=colors[mode],
-            linewidth=2.2,
-        )
-        ax2.plot(
-            x,
-            results[mode]["aoi"],
-            label=mode.upper(),
-            color=colors[mode],
-            linewidth=2.2,
-        )
+    metrics = ["cwnd", "throughput", "aoi", "loss"]
 
-    ax1.set_title("Throughput Comparison (Independent TCPEnv)", fontsize=14)
-    ax2.set_title("AoI Comparison (Independent TCPEnv)", fontsize=14)
-    ax1.set_ylabel("Throughput")
-    ax2.set_ylabel("AoI")
-    ax2.set_xlabel("Step")
-    ax1.legend()
-    ax2.legend()
-    plt.grid(True, alpha=0.3)
+    # =====================================================
+    # single plots
+    # =====================================================
+    for metric in metrics:
+        plt.figure(figsize=(10, 5))
+
+        for m in results:
+            plt.plot(x, results[m][metric], label=m.upper(), color=colors[m])
+
+        plt.title(metric.upper())
+        plt.xlabel("Step")
+        plt.legend()
+        plt.grid(alpha=0.3)
+
+        path = f"figures/{metric}.png"
+        plt.savefig(path, dpi=300)
+        plt.close()
+
+        print(f"📁 saved: {path}")
+
+    # =====================================================
+    # combined plot
+    # =====================================================
+    fig, axs = plt.subplots(4, 1, figsize=(14, 12))
+
+    for m in results:
+        axs[0].plot(x, results[m]["cwnd"], label=m.upper(), color=colors[m])
+        axs[1].plot(x, results[m]["throughput"], label=m.upper(), color=colors[m])
+        axs[2].plot(x, results[m]["aoi"], label=m.upper(), color=colors[m])
+        axs[3].plot(x, results[m]["loss"], label=m.upper(), color=colors[m])
+
+    axs[0].set_title("CWND")
+    axs[1].set_title("Throughput")
+    axs[2].set_title("AoI")
+    axs[3].set_title("Loss Rate")
+
+    for ax in axs:
+        ax.legend()
+        ax.grid(alpha=0.3)
+
     plt.tight_layout()
-    plt.savefig("Independent_TCPEnv_Comparison.png", dpi=300)
-    print("✅ 比較圖已儲存: Independent_TCPEnv_Comparison.png")
+
+    path = f"figures/combined_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+    fig.savefig(path, dpi=300)
+
+    print(f"📊 saved combined: {path}")
+
     plt.show()
 
 
+# =========================================================
+# MAIN ENTRY
+# =========================================================
 if __name__ == "__main__":
-    compare_modes(steps=150)
+    steps = 150
+
+    results = run_experiment(steps)
+
+    plot_results(results, steps)
+
+    print("\n✅ finished")

@@ -1,19 +1,37 @@
-# env_server.py
 import asyncio
 import json
-import uuid
 import random
-import numpy as np
+import uuid
 
-# 使用你原本的 TCPEnv
-from environment import TCPEnv  # ← 請確認 import 路徑正確
+from environment import TCPEnv
 
-# 儲存多個獨立環境
-sessions: dict[str, TCPEnv] = {}
+sessions = {}
 
 
+# =========================================================
+# SAFE INFO NORMALIZER（關鍵）
+# =========================================================
+def normalize_info(info, state):
+
+    return {
+        # ===== network =====
+        "throughput": float(info.get("network", {}).get("throughput", 0)),
+        "loss_rate": float(info.get("network", {}).get("loss_rate", 0)),
+        "rtt": float(info.get("network", {}).get("rtt", 0)),
+        "bandwidth": float(info.get("network", {}).get("bandwidth", 0)),
+        # ===== sender =====
+        "cwnd": float(info.get("sender", {}).get("cwnd", 0)),
+        # ===== receiver =====
+        "aoi": float(info.get("receiver", {}).get("aoi", 0)),
+        # ===== router =====
+        "queue": int(info.get("router", {}).get("queue_size", 0)),
+    }
+
+
+# =========================================================
+# CLIENT HANDLER
+# =========================================================
 async def handle_client(reader, writer):
-    addr = writer.get_extra_info("peername")
 
     try:
         while True:
@@ -22,65 +40,67 @@ async def handle_client(reader, writer):
                 break
 
             request = json.loads(data.decode().strip())
-            command = request.get("command")
+            cmd = request.get("command")
 
-            if command == "create":
+            # ================= CREATE =================
+            if cmd == "create":
                 mode = request.get("mode", "agent")
-                seed = request.get("seed", random.randint(1, 100000))
-
-                # 固定隨機種子，讓比較更公平
-                random.seed(seed)
-                np.random.seed(seed)
+                seed = request.get("seed", random.randint(0, 99999))
 
                 session_id = str(uuid.uuid4())
-                sessions[session_id] = TCPEnv(mode=mode)  # 使用你原本的 TCPEnv
+
+                env = TCPEnv(mode=mode, seed=seed)
+                sessions[session_id] = env
 
                 response = {
                     "status": "ok",
-                    "command": "create",
                     "session_id": session_id,
                     "mode": mode,
                     "seed": seed,
                 }
 
-            elif command == "reset":
+            # ================= RESET =================
+            elif cmd == "reset":
                 session_id = request.get("session_id")
                 env = sessions.get(session_id)
+
                 if env:
-                    env.reset()  # 使用你原本的 reset
+                    state, info = env.reset()
+
                     response = {
                         "status": "ok",
-                        "command": "reset",
-                        "state": env.get_state().tolist(),
+                        "state": state.tolist(),
+                        "info": normalize_info(info, state),
                     }
-                else:
-                    response = {"status": "error", "message": "Session not found"}
 
-            elif command == "step":
+                else:
+                    response = {"status": "error", "msg": "no session"}
+
+            # ================= STEP =================
+            elif cmd == "step":
                 session_id = request.get("session_id")
                 action = request.get("action")
+
                 env = sessions.get(session_id)
 
                 if env:
-                    # 使用你原本的 step 方法
-                    next_state, reward, done, info = env.step(
-                        action=action,
-                        cwnd=request.get("cwnd"),
-                        coef=request.get("coef"),
-                    )
+                    state, reward, terminated, truncated, info = env.step(action)
+
                     response = {
                         "status": "ok",
-                        "command": "step",
-                        "state": next_state.tolist(),
-                        "reward": reward,
-                        "done": done,
-                        "info": info,
+                        "state": state.tolist(),
+                        "reward": float(reward),
+                        "terminated": bool(terminated),
+                        "truncated": bool(truncated),
+                        # 🔥 KEY FIX: stable schema
+                        "info": normalize_info(info, state),
                     }
+
                 else:
-                    response = {"status": "error", "message": "Session not found"}
+                    response = {"status": "error", "msg": "no session"}
 
             else:
-                response = {"status": "error", "message": "Unknown command"}
+                response = {"status": "error", "msg": "unknown command"}
 
             writer.write((json.dumps(response) + "\n").encode())
             await writer.drain()
@@ -90,11 +110,14 @@ async def handle_client(reader, writer):
         await writer.wait_closed()
 
 
+# =========================================================
+# MAIN
+# =========================================================
 async def main():
+
     server = await asyncio.start_server(handle_client, "127.0.0.1", 8888)
-    print("🚀 TCP Environment Server 已啟動")
-    print("使用獨立 TCPEnv 實例（每個 mode 有自己的 Router）")
-    print("隨機種子固定 → 公平比較\n")
+
+    print("🚀 TCP RL Env Server running (stable schema enabled)")
 
     async with server:
         await server.serve_forever()
