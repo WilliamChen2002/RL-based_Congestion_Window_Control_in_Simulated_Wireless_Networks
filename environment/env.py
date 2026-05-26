@@ -49,14 +49,14 @@ class TCPEnv:
         )
 
     # ---------------- STEP (Agent only controls action) ----------------
-    def step(self, action=None):
+    def step(self, action=None, cwnd=None):
 
         self.time += 1
         self.step_count += 1
 
         # ===== Agent control =====
         if self.mode == "agent":
-            self.sender.apply(action)
+            self.sender.apply(action, cwnd)
 
         # ===== network simulation =====
         packets = self.sender.send(self.time)

@@ -51,7 +51,7 @@ class TCPEnvClient:
         res = self._recv()
         return res["state"]
 
-    def step(self, session_id, action):
+    def step(self, session_id, action, cwnd):
         """
         RL standard interface:
 
@@ -59,7 +59,14 @@ class TCPEnvClient:
             obs, reward, done, info
         """
 
-        self._send({"command": "step", "session_id": session_id, "action": action})
+        self._send(
+            {
+                "command": "step",
+                "session_id": session_id,
+                "action": action,
+                "cwnd": cwnd,
+            }
+        )
 
         res = self._recv()
 
@@ -132,7 +139,7 @@ def run_episode(client, session_id, agent, agent_type, steps=150):
 # =========================================================
 # MULTI-MODE EXPERIMENT (RENO / CUBIC / AGENT)
 # =========================================================
-def run_experiment(steps=150):
+def run_experiment(steps=150, agnet=None, cwnd=None):
 
     client = TCPEnvClient()
 
@@ -170,12 +177,12 @@ def run_experiment(steps=150):
             sid = sessions[m]
 
             # ===== simple baseline agent =====
-            if m == "agent":
-                action = random.choice([0, 1, 2])
-            else:
-                action = None
+            # if m == "agent":
+            #     action = random.choice([0, 1, 2])
+            # else:
+            #     action = None
 
-            _, _, _, info = client.step(sid, action)
+            _, _, _, info = client.step(sid, action, cwnd)
 
             results[m]["cwnd"].append(info["cwnd"])
             results[m]["throughput"].append(info["throughput"])
@@ -258,7 +265,7 @@ def plot_results(results, steps):
 if __name__ == "__main__":
     steps = 150
 
-    results = run_experiment(steps)
+    results = run_experiment(steps, action=1, cwnd=10)
 
     plot_results(results, steps)
 

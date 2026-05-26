@@ -80,11 +80,11 @@ async def handle_client(reader, writer):
             elif cmd == "step":
                 session_id = request.get("session_id")
                 action = request.get("action")
-
+                cwnd = request.get("cwnd")
                 env = sessions.get(session_id)
 
                 if env:
-                    state, reward, terminated, truncated, info = env.step(action)
+                    state, reward, terminated, truncated, info = env.step(action, cwnd)
 
                     response = {
                         "status": "ok",
