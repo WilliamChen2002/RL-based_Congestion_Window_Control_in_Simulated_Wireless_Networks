@@ -139,7 +139,7 @@ def run_episode(client, session_id, agent, agent_type, steps=150):
 # =========================================================
 # MULTI-MODE EXPERIMENT (RENO / CUBIC / AGENT)
 # =========================================================
-def run_experiment(steps=150, agnet=None, cwnd=None):
+def run_experiment(steps=150):
 
     client = TCPEnvClient()
 
@@ -177,10 +177,11 @@ def run_experiment(steps=150, agnet=None, cwnd=None):
             sid = sessions[m]
 
             # ===== simple baseline agent =====
-            # if m == "agent":
-            #     action = random.choice([0, 1, 2])
-            # else:
-            #     action = None
+            if m == "agent":
+                action, cwnd = agent_choice()
+            else:
+                action = None
+                cwnd = None
 
             _, _, _, info = client.step(sid, action, cwnd)
 
@@ -188,6 +189,7 @@ def run_experiment(steps=150, agnet=None, cwnd=None):
             results[m]["throughput"].append(info["throughput"])
             results[m]["aoi"].append(info["aoi"])
             results[m]["loss"].append(info["loss_rate"])
+            agent_get_info(client.step(sid, action, cwnd))
 
         if t % 30 == 0:
             print(f"Step {t} done")
@@ -259,13 +261,23 @@ def plot_results(results, steps):
     plt.show()
 
 
+def agent_choice():
+    action = 1
+    cwnd = 10
+    return action, cwnd
+
+
+def agent_get_info(info):
+    print(info)
+
+
 # =========================================================
 # MAIN ENTRY
 # =========================================================
 if __name__ == "__main__":
     steps = 150
 
-    results = run_experiment(steps, action=1, cwnd=10)
+    results = run_experiment(steps)
 
     plot_results(results, steps)
 
