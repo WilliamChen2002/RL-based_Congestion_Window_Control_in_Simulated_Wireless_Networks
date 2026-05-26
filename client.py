@@ -261,14 +261,34 @@ def plot_results(results, steps):
     plt.show()
 
 
+# Give env agent choice(Agent control)
 def agent_choice():
-    action = 1
-    cwnd = 10
+    action, cwnd = simulate_agent()
     return action, cwnd
 
 
+# Env feedback
 def agent_get_info(info):
+    while True:
+        read_ok = agent_read_status
+        if read_ok:
+            break
     print(info)
+
+
+# Simulate agent action: DQN set action 0, 1, 2; DDPG set cwnd
+def simulate_agent():
+    action = None
+    cwnd = random.randint(10, 20)
+    return action, cwnd
+
+
+# Agent read dat time when agent read data over, return True else False or don't return
+def agent_read_status():
+    import time
+
+    time.sleep(10)
+    return True
 
 
 # =========================================================
