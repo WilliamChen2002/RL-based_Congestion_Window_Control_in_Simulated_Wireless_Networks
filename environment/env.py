@@ -78,7 +78,7 @@ class TCPEnv:
             self.sender.on_ack(ack)
 
         # ===== reward =====
-        reward = throughput - 0.1 * rtt - 20 * loss_rate - 0.5 * aoi
+        reward = throughput - 0.1 * rtt - 5 * loss_rate - 0.5 * aoi
 
         # ===== episode control =====
         terminated = False

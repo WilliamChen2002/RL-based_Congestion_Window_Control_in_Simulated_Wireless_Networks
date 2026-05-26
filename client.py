@@ -270,7 +270,7 @@ def agent_choice():
 # Env feedback
 def agent_get_info(info):
     while True:
-        read_ok = agent_read_status
+        read_ok = agent_read_status()
         if read_ok:
             break
     print(info)
@@ -280,6 +280,7 @@ def agent_get_info(info):
 def simulate_agent():
     action = None
     cwnd = random.randint(10, 20)
+    print(f"Agent do: actio={action}, cwnd={cwnd}")
     return action, cwnd
 
 
@@ -287,7 +288,8 @@ def simulate_agent():
 def agent_read_status():
     import time
 
-    time.sleep(10)
+    print("Agent reading data")
+    time.sleep(1)
     return True
 
 
