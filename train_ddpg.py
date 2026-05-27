@@ -2,10 +2,13 @@
 train_ddpg.py — DDPG 訓練主程式
 
 用法：
-  python train_ddpg.py
+  1. 先啟動 server：python env_server.py
+  2. 再執行：       python train_ddpg.py
 
-State  : [cwnd, throughput, aoi, loss_rate, queue]（正規化，5維）
-Action : 目標 cwnd 值，範圍 [1.0, 100.0]（連續）
+State（5維，從 info 組成後正規化）：
+  [cwnd, throughput, aoi, loss_rate, queue]
+
+Action：目標 cwnd 值，範圍 [1.0, 100.0]（連續）
 """
 
 from datetime import datetime
@@ -14,19 +17,41 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from agent import DDPGAgent
-from env_wrapper import DDPGEnvWrapper
+from client import TCPEnvClient
 
 # ── 訓練設定 ──
-N_EPISODES = 1000   # 可調整
-EVAL_EVERY = 50     # 每幾個 episode 印一次進度
+N_EPISODES = 1000
+EVAL_EVERY = 50
+SEED = 42
+
+# ── 正規化上限 ──
+MAX_CWND = 100.0
+MAX_THROUGHPUT = 80.0
+MAX_AOI = 30.0
+MAX_QUEUE = 300.0
+
+
+def make_state(info: dict) -> np.ndarray:
+    """把 info 組成正規化 5 維 state。"""
+    return np.array(
+        [
+            info["cwnd"]       / MAX_CWND,
+            info["throughput"] / MAX_THROUGHPUT,
+            info["aoi"]        / MAX_AOI,
+            info["loss_rate"],
+            info["queue"]      / MAX_QUEUE,
+        ],
+        dtype=np.float32,
+    ).clip(0.0, 1.0)
+
+
+def make_init_state() -> np.ndarray:
+    """reset 時尚無 info，用初始值。"""
+    return np.array([0.1, 0.0, 0.0, 0.0, 0.0], dtype=np.float32)
 
 
 def train() -> tuple[DDPGAgent, dict]:
-    env = DDPGEnvWrapper()
-
-    from stable_baselines3.common.env_checker import check_env
-    check_env(env, warn=True)
-
+    client = TCPEnvClient()
     agent = DDPGAgent()
 
     history: dict[str, list] = {
@@ -41,7 +66,11 @@ def train() -> tuple[DDPGAgent, dict]:
     }
 
     for ep in range(1, N_EPISODES + 1):
-        state, _ = env.reset(seed=42 if ep == 1 else None)
+        resp = client.create(mode="agent", seed=SEED if ep == 1 else ep)
+        session_id = resp["session_id"]
+        client.reset(session_id)
+
+        state = make_init_state()
         done = False
         ep_reward = 0.0
         ep_info: dict[str, list] = {
@@ -55,18 +84,25 @@ def train() -> tuple[DDPGAgent, dict]:
 
         while not done:
             action = agent.select_action(state, explore=True)
-            next_state, reward, terminated, truncated, info = env.step(action)
-            done = terminated or truncated
+            cwnd_val = float(action[0])
+
+            _, reward, done, info = client.step(
+                session_id,
+                action=None,
+                cwnd=cwnd_val,
+            )
+
+            next_state = make_state(info)
 
             agent.store(state, action, reward, next_state, done)
             loss_info = agent.train_step()
 
             state = next_state
             ep_reward += reward
-            ep_info["throughput"].append(info["network"]["throughput"])
-            ep_info["aoi"].append(info["receiver"]["aoi"])
-            ep_info["loss"].append(info["network"]["loss_rate"])
-            ep_info["cwnd"].append(info["sender"]["cwnd"])
+            ep_info["throughput"].append(info["throughput"])
+            ep_info["aoi"].append(info["aoi"])
+            ep_info["loss"].append(info["loss_rate"])
+            ep_info["cwnd"].append(info["cwnd"])
 
             if loss_info is not None:
                 ep_info["actor_loss"].append(loss_info["actor_loss"])
@@ -101,6 +137,7 @@ def train() -> tuple[DDPGAgent, dict]:
                 f"A_loss {a_loss:.4f} | C_loss {c_loss:.4f}"
             )
 
+    client.close()
     agent.save("ddpg_agent.pth")
     return agent, history
 

@@ -2,10 +2,13 @@
 train_dqn.py — DQN 訓練主程式
 
 用法：
-  python train_dqn.py
+  1. 先啟動 server：python env_server.py
+  2. 再執行：       python train_dqn.py
 
-State  : [cwnd, throughput, aoi, loss_rate, queue]（正規化，5維）
-Action : 0=減少 / 1=不變 / 2=增加 cwnd（離散）
+State（5維，從 info 組成後正規化）：
+  [cwnd, throughput, aoi, loss_rate, queue]
+
+Action：0=減少 / 1=不變 / 2=增加 cwnd（離散）
 """
 
 from datetime import datetime
@@ -14,19 +17,41 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from agent import DQNAgent
-from env_wrapper import DQNEnvWrapper
+from client import TCPEnvClient
 
 # ── 訓練設定 ──
-N_EPISODES = 1000   # 可調整
-EVAL_EVERY = 50     # 每幾個 episode 印一次進度
+N_EPISODES = 1000
+EVAL_EVERY = 50
+SEED = 42
+
+# ── 正規化上限 ──
+MAX_CWND = 100.0
+MAX_THROUGHPUT = 80.0
+MAX_AOI = 30.0
+MAX_QUEUE = 300.0
+
+
+def make_state(info: dict) -> np.ndarray:
+    """把 info 組成正規化 5 維 state。"""
+    return np.array(
+        [
+            info["cwnd"]       / MAX_CWND,
+            info["throughput"] / MAX_THROUGHPUT,
+            info["aoi"]        / MAX_AOI,
+            info["loss_rate"],
+            info["queue"]      / MAX_QUEUE,
+        ],
+        dtype=np.float32,
+    ).clip(0.0, 1.0)
+
+
+def make_init_state() -> np.ndarray:
+    """reset 時尚無 info，用初始值。"""
+    return np.array([0.1, 0.0, 0.0, 0.0, 0.0], dtype=np.float32)
 
 
 def train() -> tuple[DQNAgent, dict]:
-    env = DQNEnvWrapper()
-
-    from stable_baselines3.common.env_checker import check_env
-    check_env(env, warn=True)
-
+    client = TCPEnvClient()
     agent = DQNAgent()
 
     history: dict[str, list] = {
@@ -39,7 +64,12 @@ def train() -> tuple[DQNAgent, dict]:
     }
 
     for ep in range(1, N_EPISODES + 1):
-        state, _ = env.reset(seed=42 if ep == 1 else None)
+        # 建立 session 並 reset
+        resp = client.create(mode="agent", seed=SEED if ep == 1 else ep)
+        session_id = resp["session_id"]
+        client.reset(session_id)
+
+        state = make_init_state()
         done = False
         ep_reward = 0.0
         ep_info: dict[str, list] = {
@@ -51,17 +81,22 @@ def train() -> tuple[DQNAgent, dict]:
 
         while not done:
             action = agent.select_action(state)
-            next_state, reward, terminated, truncated, info = env.step(action)
-            done = terminated or truncated
+            _, reward, done, info = client.step(
+                session_id,
+                action=action,
+                cwnd=None,
+            )
+
+            next_state = make_state(info)
 
             agent.store(state, action, reward, next_state, done)
             q_loss = agent.train_step()
 
             state = next_state
             ep_reward += reward
-            ep_info["throughput"].append(info["network"]["throughput"])
-            ep_info["aoi"].append(info["receiver"]["aoi"])
-            ep_info["loss"].append(info["network"]["loss_rate"])
+            ep_info["throughput"].append(info["throughput"])
+            ep_info["aoi"].append(info["aoi"])
+            ep_info["loss"].append(info["loss_rate"])
 
             if q_loss is not None:
                 ep_info["q_loss"].append(q_loss)
@@ -88,6 +123,7 @@ def train() -> tuple[DQNAgent, dict]:
                 f"Q_loss {history['q_loss'][-1]:.4f}"
             )
 
+    client.close()
     agent.save("dqn_agent.pth")
     return agent, history
 

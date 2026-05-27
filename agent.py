@@ -42,12 +42,6 @@ DQN_GRAD_CLIP = 1.0
 
 
 class QNetwork(nn.Module):
-    """
-    MLP：state → Q value（每個 action 一個）
-    輸入：正規化後的 state（5維）
-    輸出：[Q(s,減少), Q(s,不變), Q(s,增加)]
-    """
-
     def __init__(self, state_dim: int = STATE_DIM, action_dim: int = DQN_ACTION_DIM) -> None:
         super().__init__()
         self.net = nn.Sequential(
@@ -66,14 +60,7 @@ class ReplayBuffer:
     def __init__(self, capacity: int) -> None:
         self._buf: deque = deque(maxlen=capacity)
 
-    def push(
-        self,
-        state: np.ndarray,
-        action,
-        reward: float,
-        next_state: np.ndarray,
-        done: bool,
-    ) -> None:
+    def push(self, state, action, reward, next_state, done) -> None:
         self._buf.append((state, action, reward, next_state, done))
 
     def sample(self, batch_size: int) -> tuple:
@@ -107,21 +94,13 @@ class DQNAgent:
         self._total_steps = 0
 
     def select_action(self, state: np.ndarray) -> int:
-        """ε-greedy：探索或利用"""
         if random.random() < self.eps:
             return random.randint(0, DQN_ACTION_DIM - 1)
         state_t = torch.tensor(state, dtype=torch.float32).unsqueeze(0).to(self.device)
         with torch.no_grad():
             return int(self.q_net(state_t).argmax().item())
 
-    def store(
-        self,
-        state: np.ndarray,
-        action: int,
-        reward: float,
-        next_state: np.ndarray,
-        done: bool,
-    ) -> None:
+    def store(self, state, action, reward, next_state, done) -> None:
         self.buffer.push(state, action, reward, next_state, done)
 
     def train_step(self) -> float | None:
@@ -186,12 +165,6 @@ DDPG_NOISE_DECAY = 0.99
 
 
 class Actor(nn.Module):
-    """
-    輸入：state（5維）
-    輸出：目標 cwnd，範圍 [ACTION_LOW, ACTION_HIGH]
-    用 Sigmoid 輸出後線性縮放。
-    """
-
     def __init__(
         self,
         state_dim: int = STATE_DIM,
@@ -216,11 +189,6 @@ class Actor(nn.Module):
 
 
 class Critic(nn.Module):
-    """
-    輸入：state（5維）+ action（1維）拼接
-    輸出：Q value（scalar）
-    """
-
     def __init__(self, state_dim: int = STATE_DIM, action_dim: int = DDPG_ACTION_DIM) -> None:
         super().__init__()
         self.net = nn.Sequential(
@@ -255,10 +223,6 @@ class DDPGAgent:
         self.noise_sigma = DDPG_NOISE_SIGMA_START
 
     def select_action(self, state: np.ndarray, explore: bool = True) -> np.ndarray:
-        """
-        Actor 輸出 cwnd，加 Gaussian noise 探索。
-        回傳 shape=(1,) 的 ndarray。
-        """
         state_t = torch.tensor(state, dtype=torch.float32).unsqueeze(0).to(self.device)
         with torch.no_grad():
             action = self.actor(state_t).cpu().numpy().flatten()
@@ -269,14 +233,7 @@ class DDPGAgent:
 
         return np.clip(action, DDPG_ACTION_LOW, DDPG_ACTION_HIGH).astype(np.float32)
 
-    def store(
-        self,
-        state: np.ndarray,
-        action: np.ndarray,
-        reward: float,
-        next_state: np.ndarray,
-        done: bool,
-    ) -> None:
+    def store(self, state, action, reward, next_state, done) -> None:
         self.buffer.push(state, action, reward, next_state, done)
 
     def train_step(self) -> dict | None:
@@ -291,7 +248,6 @@ class DDPGAgent:
         next_states_t = torch.tensor(next_states).to(self.device)
         dones_t = torch.tensor(dones).unsqueeze(1).to(self.device)
 
-        # ── Critic 更新 ──
         with torch.no_grad():
             next_actions = self.actor_target(next_states_t)
             next_q = self.critic_target(next_states_t, next_actions)
@@ -305,14 +261,12 @@ class DDPGAgent:
         nn.utils.clip_grad_norm_(self.critic.parameters(), max_norm=DDPG_GRAD_CLIP)
         self.critic_optimizer.step()
 
-        # ── Actor 更新 ──
         actor_loss = -self.critic(states_t, self.actor(states_t)).mean()
 
         self.actor_optimizer.zero_grad()
         actor_loss.backward()
         self.actor_optimizer.step()
 
-        # ── Soft update target networks ──
         self._soft_update(self.actor, self.actor_target)
         self._soft_update(self.critic, self.critic_target)
 
@@ -322,7 +276,6 @@ class DDPGAgent:
         }
 
     def _soft_update(self, online: nn.Module, target: nn.Module) -> None:
-        """θ_target = τ × θ_online + (1-τ) × θ_target"""
         for p_online, p_target in zip(online.parameters(), target.parameters()):
             p_target.data.copy_(
                 DDPG_TAU * p_online.data + (1 - DDPG_TAU) * p_target.data
