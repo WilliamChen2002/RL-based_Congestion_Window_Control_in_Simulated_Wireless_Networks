@@ -1,37 +1,41 @@
+<<<<<<< HEAD
+from .packet import Packet
+=======
+from abc import ABC, abstractmethod
+
 from .packet import Packet
 
-class Sender:
+>>>>>>> main
+
+class BaseSender(ABC):
     def __init__(self):
 
-        self.cwnd = 10.0
+        self.init_cwnd = 10.0
+        self.init_ssthresh = 32.0
 
-        self.ssthresh = 32.0
+        self.cwnd = self.init_cwnd
+        self.ssthresh = self.init_ssthresh
+        self.seq = 0
 
-        self.next_seq = 0
+    def reset(self):
+        self.cwnd = self.init_cwnd
+        self.ssthresh = self.init_ssthresh
+        self.seq = 0
 
-    def apply_action(self, action):
-
-        # RL action
-
-        if action == 0:
-            self.cwnd *= 0.7
-
-        elif action == 2:
-            self.cwnd *= 1.2
-
-        self.cwnd = max(1.0, self.cwnd)
-
-    def send_packets(self):
+    def send(self, time):
 
         packets = []
 
-        send_num = int(self.cwnd)
-
-        for _ in range(send_num):
-            pkt = Packet(self.next_seq)
-
-            packets.append(pkt)
-
-            self.next_seq += 1
+        for _ in range(int(self.cwnd)):
+            packets.append(Packet(self.seq, time))
+            self.seq += 1
 
         return packets
+
+    @abstractmethod
+    def on_ack(self, ack):
+        pass
+
+    @abstractmethod
+    def on_loss(self):
+        pass

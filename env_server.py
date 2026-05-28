@@ -8,9 +8,12 @@ from environment import TCPEnv
 sessions = {}
 
 
+<<<<<<< HEAD
 # =========================================================
 # SAFE INFO NORMALIZER
 # =========================================================
+=======
+>>>>>>> main
 def normalize_info(info, state):
 
     return {
@@ -28,9 +31,12 @@ def normalize_info(info, state):
     }
 
 
+<<<<<<< HEAD
 # =========================================================
 # CLIENT HANDLER
 # =========================================================
+=======
+>>>>>>> main
 async def handle_client(reader, writer):
 
     try:
@@ -59,7 +65,10 @@ async def handle_client(reader, writer):
                     "seed": seed,
                 }
 
+<<<<<<< HEAD
             # ================= RESET =================
+=======
+>>>>>>> main
             elif cmd == "reset":
                 session_id = request.get("session_id")
                 env = sessions.get(session_id)
@@ -76,6 +85,7 @@ async def handle_client(reader, writer):
                 else:
                     response = {"status": "error", "msg": "no session"}
 
+<<<<<<< HEAD
             # ================= STEP =================
             elif cmd == "step":
                 session_id = request.get("session_id")
@@ -90,6 +100,16 @@ async def handle_client(reader, writer):
                         env.sender.cwnd = float(cwnd)
 
                     state, reward, terminated, truncated, info = env.step(action)
+=======
+            elif cmd == "step":
+                session_id = request.get("session_id")
+                action = request.get("action")
+                cwnd = request.get("cwnd")
+                env = sessions.get(session_id)
+
+                if env:
+                    state, reward, terminated, truncated, info = env.step(action, cwnd)
+>>>>>>> main
 
                     response = {
                         "status": "ok",
@@ -97,7 +117,10 @@ async def handle_client(reader, writer):
                         "reward": float(reward),
                         "terminated": bool(terminated),
                         "truncated": bool(truncated),
+<<<<<<< HEAD
                         "done": bool(terminated or truncated),
+=======
+>>>>>>> main
                         "info": normalize_info(info, state),
                     }
 
@@ -115,14 +138,21 @@ async def handle_client(reader, writer):
         await writer.wait_closed()
 
 
+<<<<<<< HEAD
 # =========================================================
 # MAIN
 # =========================================================
+=======
+>>>>>>> main
 async def main():
 
     server = await asyncio.start_server(handle_client, "127.0.0.1", 8888)
 
+<<<<<<< HEAD
     print("🚀 TCP RL Env Server running (stable schema enabled)")
+=======
+    print("TCP RL Env Server running (stable schema enabled)")
+>>>>>>> main
 
     async with server:
         await server.serve_forever()
