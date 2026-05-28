@@ -7,18 +7,12 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 
 
-# =========================================================
-# CLEAN RL-STYLE TCP CLIENT (API VERSION)
-# =========================================================
 class TCPEnvClient:
     def __init__(self, host="127.0.0.1", port=8888):
 
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.connect((host, port))
 
-    # -----------------------------
-    # internal IO
-    # -----------------------------
     def _send(self, data):
         self.sock.sendall((json.dumps(data) + "\n").encode())
 
@@ -30,10 +24,6 @@ class TCPEnvClient:
             if b"\n" in buffer:
                 break
         return json.loads(buffer.decode().strip())
-
-    # =====================================================
-    # PUBLIC API (FOR AGENT DEVELOPERS)
-    # =====================================================
 
     def create(self, mode="agent", seed=42):
         """
@@ -77,9 +67,6 @@ class TCPEnvClient:
         self.sock.close()
 
 
-# =========================================================
-# ACTION WRAPPER (FOR MULTI-AGENT SUPPORT)
-# =========================================================
 def build_action(agent_type, agent, state):
 
     if agent_type == "dqn":
@@ -95,9 +82,6 @@ def build_action(agent_type, agent, state):
         return 1
 
 
-# =========================================================
-# EPISODE RUNNER (CLEAN RL LOOP)
-# =========================================================
 def run_episode(client, session_id, agent, agent_type, steps=150):
 
     state = client.reset(session_id)
@@ -105,13 +89,10 @@ def run_episode(client, session_id, agent, agent_type, steps=150):
     trajectory = []
 
     for _t in range(steps):
-        # ===== 1. agent action =====
         action = build_action(agent_type, agent, state)
 
-        # ===== 2. env step =====
         next_state, reward, done, info = client.step(session_id, action)
 
-        # ===== 3. store transition =====
         transition = {
             "state": state,
             "action": action,
@@ -122,7 +103,6 @@ def run_episode(client, session_id, agent, agent_type, steps=150):
 
         trajectory.append(transition)
 
-        # ===== 4. learning hook =====
         if hasattr(agent, "store"):
             agent.store(transition)
 
@@ -137,9 +117,6 @@ def run_episode(client, session_id, agent, agent_type, steps=150):
     return trajectory
 
 
-# =========================================================
-# MULTI-MODE EXPERIMENT (RENO / CUBIC / AGENT)
-# =========================================================
 def run_experiment(steps=150):
 
     client = TCPEnvClient()
@@ -159,9 +136,6 @@ def run_experiment(steps=150):
         for m in modes
     }
 
-    # -----------------------------
-    # create sessions
-    # -----------------------------
     for m in modes:
         resp = client.create(mode=m, seed=seed)
         sid = resp["session_id"]
@@ -170,14 +144,10 @@ def run_experiment(steps=150):
 
     print("🚀 simulation start...\n")
 
-    # -----------------------------
-    # main loop
-    # -----------------------------
     for t in range(steps):
         for m in modes:
             sid = sessions[m]
 
-            # ===== simple baseline agent =====
             if m == "agent":
                 action, cwnd = agent_choice()
             else:
@@ -199,9 +169,6 @@ def run_experiment(steps=150):
     return results
 
 
-# =========================================================
-# PLOTTING (4 METRICS + COMBINED)
-# =========================================================
 def plot_results(results, steps):
 
     x = range(steps)
@@ -212,9 +179,6 @@ def plot_results(results, steps):
 
     metrics = ["cwnd", "throughput", "aoi", "loss"]
 
-    # =====================================================
-    # single plots
-    # =====================================================
     for metric in metrics:
         plt.figure(figsize=(10, 5))
 
@@ -230,11 +194,8 @@ def plot_results(results, steps):
         plt.savefig(path, dpi=300)
         plt.close()
 
-        print(f"📁 saved: {path}")
+        print(f"saved: {path}")
 
-    # =====================================================
-    # combined plot
-    # =====================================================
     fig, axs = plt.subplots(4, 1, figsize=(14, 12))
 
     for m in results:
@@ -294,9 +255,6 @@ def agent_read_status():
     return True
 
 
-# =========================================================
-# MAIN ENTRY
-# =========================================================
 if __name__ == "__main__":
     steps = 150
 
@@ -304,4 +262,4 @@ if __name__ == "__main__":
 
     plot_results(results, steps)
 
-    print("\n✅ finished")
+    print("\nfinished")

@@ -8,35 +8,19 @@ from environment import TCPEnv
 sessions = {}
 
 
-<<<<<<< HEAD
-# =========================================================
-# SAFE INFO NORMALIZER
-# =========================================================
-=======
->>>>>>> main
 def normalize_info(info, state):
 
     return {
-        # ===== network =====
         "throughput": float(info.get("network", {}).get("throughput", 0)),
         "loss_rate": float(info.get("network", {}).get("loss_rate", 0)),
         "rtt": float(info.get("network", {}).get("rtt", 0)),
         "bandwidth": float(info.get("network", {}).get("bandwidth", 0)),
-        # ===== sender =====
         "cwnd": float(info.get("sender", {}).get("cwnd", 0)),
-        # ===== receiver =====
         "aoi": float(info.get("receiver", {}).get("aoi", 0)),
-        # ===== router =====
         "queue": int(info.get("router", {}).get("queue_size", 0)),
     }
 
 
-<<<<<<< HEAD
-# =========================================================
-# CLIENT HANDLER
-# =========================================================
-=======
->>>>>>> main
 async def handle_client(reader, writer):
 
     try:
@@ -48,7 +32,6 @@ async def handle_client(reader, writer):
             request = json.loads(data.decode().strip())
             cmd = request.get("command")
 
-            # ================= CREATE =================
             if cmd == "create":
                 mode = request.get("mode", "agent")
                 seed = request.get("seed", random.randint(0, 99999))
@@ -65,10 +48,6 @@ async def handle_client(reader, writer):
                     "seed": seed,
                 }
 
-<<<<<<< HEAD
-            # ================= RESET =================
-=======
->>>>>>> main
             elif cmd == "reset":
                 session_id = request.get("session_id")
                 env = sessions.get(session_id)
@@ -85,12 +64,10 @@ async def handle_client(reader, writer):
                 else:
                     response = {"status": "error", "msg": "no session"}
 
-<<<<<<< HEAD
-            # ================= STEP =================
             elif cmd == "step":
                 session_id = request.get("session_id")
                 action = request.get("action")
-                cwnd = request.get("cwnd")   # DDPG 用，直接設定目標 cwnd
+                cwnd = request.get("cwnd")  # DDPG 用，直接設定目標 cwnd
 
                 env = sessions.get(session_id)
 
@@ -100,16 +77,6 @@ async def handle_client(reader, writer):
                         env.sender.cwnd = float(cwnd)
 
                     state, reward, terminated, truncated, info = env.step(action)
-=======
-            elif cmd == "step":
-                session_id = request.get("session_id")
-                action = request.get("action")
-                cwnd = request.get("cwnd")
-                env = sessions.get(session_id)
-
-                if env:
-                    state, reward, terminated, truncated, info = env.step(action, cwnd)
->>>>>>> main
 
                     response = {
                         "status": "ok",
@@ -117,10 +84,7 @@ async def handle_client(reader, writer):
                         "reward": float(reward),
                         "terminated": bool(terminated),
                         "truncated": bool(truncated),
-<<<<<<< HEAD
                         "done": bool(terminated or truncated),
-=======
->>>>>>> main
                         "info": normalize_info(info, state),
                     }
 
@@ -138,21 +102,11 @@ async def handle_client(reader, writer):
         await writer.wait_closed()
 
 
-<<<<<<< HEAD
-# =========================================================
-# MAIN
-# =========================================================
-=======
->>>>>>> main
 async def main():
 
     server = await asyncio.start_server(handle_client, "127.0.0.1", 8888)
 
-<<<<<<< HEAD
-    print("🚀 TCP RL Env Server running (stable schema enabled)")
-=======
     print("TCP RL Env Server running (stable schema enabled)")
->>>>>>> main
 
     async with server:
         await server.serve_forever()

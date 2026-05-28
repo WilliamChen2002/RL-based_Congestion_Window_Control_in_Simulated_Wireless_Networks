@@ -1,11 +1,7 @@
-<<<<<<< HEAD
-from .packet import Packet
-=======
 from abc import ABC, abstractmethod
 
 from .packet import Packet
 
->>>>>>> main
 
 class BaseSender(ABC):
     def __init__(self):
