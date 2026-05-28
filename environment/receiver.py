@@ -3,12 +3,8 @@ class Receiver:
 
         self.last_update_time = 0
 
-        # 用來 reset 的初始值
         self.init_last_update_time = 0
 
-    # =========================
-    # RESET (IMPORTANT FIX)
-    # =========================
     def reset(self):
         self.last_update_time = self.init_last_update_time
 

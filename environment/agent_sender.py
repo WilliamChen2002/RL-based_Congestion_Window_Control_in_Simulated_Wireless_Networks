@@ -28,8 +28,5 @@ class AgentSender(BaseSender):
     def on_loss(self):
         pass
 
-    # =========================
-    # RESET FIX
-    # =========================
     def reset(self):
         super().reset()

@@ -8,9 +8,6 @@ from environment import TCPEnv
 sessions = {}
 
 
-# =========================================================
-# SAFE INFO NORMALIZER（關鍵）
-# =========================================================
 def normalize_info(info, state):
 
     return {
@@ -28,9 +25,6 @@ def normalize_info(info, state):
     }
 
 
-# =========================================================
-# CLIENT HANDLER
-# =========================================================
 async def handle_client(reader, writer):
 
     try:
@@ -59,7 +53,6 @@ async def handle_client(reader, writer):
                     "seed": seed,
                 }
 
-            # ================= RESET =================
             elif cmd == "reset":
                 session_id = request.get("session_id")
                 env = sessions.get(session_id)
@@ -76,7 +69,6 @@ async def handle_client(reader, writer):
                 else:
                     response = {"status": "error", "msg": "no session"}
 
-            # ================= STEP =================
             elif cmd == "step":
                 session_id = request.get("session_id")
                 action = request.get("action")
@@ -92,7 +84,6 @@ async def handle_client(reader, writer):
                         "reward": float(reward),
                         "terminated": bool(terminated),
                         "truncated": bool(truncated),
-                        # 🔥 KEY FIX: stable schema
                         "info": normalize_info(info, state),
                     }
 
@@ -110,14 +101,11 @@ async def handle_client(reader, writer):
         await writer.wait_closed()
 
 
-# =========================================================
-# MAIN
-# =========================================================
 async def main():
 
     server = await asyncio.start_server(handle_client, "127.0.0.1", 8888)
 
-    print("🚀 TCP RL Env Server running (stable schema enabled)")
+    print("TCP RL Env Server running (stable schema enabled)")
 
     async with server:
         await server.serve_forever()

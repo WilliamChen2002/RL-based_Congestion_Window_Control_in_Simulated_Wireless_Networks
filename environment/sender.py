@@ -13,9 +13,6 @@ class BaseSender(ABC):
         self.ssthresh = self.init_ssthresh
         self.seq = 0
 
-    # =========================
-    # RESET (IMPORTANT)
-    # =========================
     def reset(self):
         self.cwnd = self.init_cwnd
         self.ssthresh = self.init_ssthresh
