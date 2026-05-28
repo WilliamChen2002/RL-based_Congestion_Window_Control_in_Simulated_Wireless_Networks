@@ -26,10 +26,6 @@ class TCPEnv:
         self.max_steps = 50
         self.reset()
 
-<<<<<<< HEAD
-    # ---------------- RESET ----------------
-=======
->>>>>>> main
     def reset(self):
         self.time = 0
         self.step_count = 0
@@ -40,10 +36,6 @@ class TCPEnv:
 
         return self.get_state(), {}
 
-<<<<<<< HEAD
-    # ---------------- STATE ----------------
-=======
->>>>>>> main
     def get_state(self):
         return np.array(
             [
@@ -54,26 +46,14 @@ class TCPEnv:
             dtype=np.float32,
         )
 
-<<<<<<< HEAD
-    # ---------------- STEP (Agent only controls action) ----------------
-=======
->>>>>>> main
     def step(self, action=None, cwnd=None):
 
         self.time += 1
         self.step_count += 1
 
-<<<<<<< HEAD
-        # ===== Agent control =====
         if self.mode == "agent":
             self.sender.apply(action, cwnd)
 
-        # ===== network simulation =====
-=======
-        if self.mode == "agent":
-            self.sender.apply(action, cwnd)
-
->>>>>>> main
         packets = self.sender.send(self.time)
         r = self.router.transmit(packets, self.time)
 
@@ -86,31 +66,16 @@ class TCPEnv:
         rtt = 50 + r["queue_delay"] + r["transmit_time"]
         throughput = ack
 
-<<<<<<< HEAD
-        # ===== TCP feedback =====
-=======
->>>>>>> main
         if loss > 0:
             self.sender.on_loss()
         else:
             self.sender.on_ack(ack)
 
-<<<<<<< HEAD
-        # ===== reward =====
-        reward = throughput - 0.1 * rtt - 5 * loss_rate - 0.5 * aoi
-
-        # ===== episode control =====
-        terminated = False
-        truncated = self.step_count >= self.max_steps
-
-        # ===== structured info =====
-=======
         reward = throughput - 0.1 * rtt - 5 * loss_rate - 0.5 * aoi
 
         terminated = False
         truncated = self.step_count >= self.max_steps
 
->>>>>>> main
         info = {
             "network": {
                 "throughput": throughput,
