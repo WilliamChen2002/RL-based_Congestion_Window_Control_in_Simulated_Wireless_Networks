@@ -1,5 +1,5 @@
 """
-compare.py — 四模式比較展示（DQN / DDPG / Reno / Cubic）
+compare.py — 六模式比較展示（DQN / DQN-noAoI / DDPG / DDPG-noAoI / Reno / Cubic）
 
 用法：
   1. 先啟動 server：python env_server.py
@@ -13,22 +13,25 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 import numpy as np
 
-from agent import DDPGAgent, DQNAgent
+from train.agent import DDPGAgent, DQNAgent
 from client import TCPEnvClient
 
 # ── 設定 ──
-STEPS = 150
-DQN_MODEL_PATH = "dqn_agent.pth"
-DDPG_MODEL_PATH = "ddpg_agent.pth"
+STEPS            = 150
+DQN_MODEL_PATH         = "dqn_agent.pth"
+DDPG_MODEL_PATH        = "ddpg_agent.pth"
+DQN_NO_AOI_MODEL_PATH  = "dqn_no_aoi.pth"
+DDPG_NO_AOI_MODEL_PATH = "ddpg_no_aoi.pth"
 
 # ── 正規化上限 ──
-MAX_CWND = 100.0
+MAX_CWND       = 100.0
 MAX_THROUGHPUT = 80.0
-MAX_AOI = 30.0
-MAX_QUEUE = 300.0
+MAX_AOI        = 30.0
+MAX_QUEUE      = 300.0
 
 
 def make_state(info: dict) -> np.ndarray:
+    """5 維 state（含 aoi）。"""
     return np.array(
         [
             info["cwnd"]       / MAX_CWND,
@@ -41,8 +44,25 @@ def make_state(info: dict) -> np.ndarray:
     ).clip(0.0, 1.0)
 
 
+def make_state_no_aoi(info: dict) -> np.ndarray:
+    """4 維 state（不含 aoi）。"""
+    return np.array(
+        [
+            info["cwnd"]       / MAX_CWND,
+            info["throughput"] / MAX_THROUGHPUT,
+            info["loss_rate"],
+            info["queue"]      / MAX_QUEUE,
+        ],
+        dtype=np.float32,
+    ).clip(0.0, 1.0)
+
+
 def make_init_state() -> np.ndarray:
     return np.array([0.1, 0.0, 0.0, 0.0, 0.0], dtype=np.float32)
+
+
+def make_init_state_no_aoi() -> np.ndarray:
+    return np.array([0.1, 0.0, 0.0, 0.0], dtype=np.float32)
 
 
 def init_log_files(timestamp: str, modes: list, base_seed: int) -> dict:
@@ -76,30 +96,42 @@ def write_log(f, step: int, info: dict) -> None:
 def compare(steps: int = STEPS) -> None:
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     base_seed = random.randint(1, 100000)
-    modes = ["dqn", "ddpg", "reno", "cubic"]
+    modes = ["dqn", "dqn_no_aoi", "ddpg", "ddpg_no_aoi", "reno", "cubic"]
 
     print(f"Base Seed: {base_seed}")
     print(f"Steps    : {steps}\n")
 
-    dqn_agent = DQNAgent()
+    # ── 載入模型 ──
+    dqn_agent = DQNAgent(state_dim=5)
     dqn_agent.load(DQN_MODEL_PATH)
 
-    ddpg_agent = DDPGAgent()
+    dqn_no_aoi_agent = DQNAgent(state_dim=4)
+    dqn_no_aoi_agent.load(DQN_NO_AOI_MODEL_PATH)
+
+    ddpg_agent = DDPGAgent(state_dim=5)
     ddpg_agent.load(DDPG_MODEL_PATH)
+
+    ddpg_no_aoi_agent = DDPGAgent(state_dim=4)
+    ddpg_no_aoi_agent.load(DDPG_NO_AOI_MODEL_PATH)
 
     log_files = init_log_files(timestamp, modes, base_seed)
 
     client = TCPEnvClient()
     sessions = {}
-    states = {}
+    states   = {}
 
     for mode in modes:
         env_mode = mode if mode in ("reno", "cubic") else "agent"
         resp = client.create(mode=env_mode, seed=base_seed)
         sessions[mode] = resp["session_id"]
         client.reset(sessions[mode])
-        states[mode] = make_init_state()
-        print(f"✅ 已建立 {mode.upper():6} 環境")
+
+        if "no_aoi" in mode:
+            states[mode] = make_init_state_no_aoi()
+        else:
+            states[mode] = make_init_state()
+
+        print(f"✅ 已建立 {mode.upper():12} 環境")
 
     print("\n開始模擬...\n")
 
@@ -113,22 +145,51 @@ def compare(steps: int = STEPS) -> None:
             if mode == "dqn":
                 action = dqn_agent.select_action(states[mode])
                 _, _, _, info = client.step(
-                    sessions[mode], action=int(action), cwnd=None,
+                    sessions[mode],
+                    action=int(action),
+                    cwnd=None,
+                    aoi_request=1,
+                )
+
+            elif mode == "dqn_no_aoi":
+                action = dqn_no_aoi_agent.select_action(states[mode])
+                _, _, _, info = client.step(
+                    sessions[mode],
+                    action=int(action),
+                    cwnd=None,
                 )
 
             elif mode == "ddpg":
-                action = ddpg_agent.select_action(states[mode], explore=False)
+                action   = ddpg_agent.select_action(states[mode], explore=False)
                 cwnd_val = float(action[0])
                 _, _, _, info = client.step(
-                    sessions[mode], action=None, cwnd=cwnd_val,
+                    sessions[mode],
+                    action=None,
+                    cwnd=cwnd_val,
+                    aoi_request=1,
+                )
+
+            elif mode == "ddpg_no_aoi":
+                action   = ddpg_no_aoi_agent.select_action(states[mode], explore=False)
+                cwnd_val = float(action[0])
+                _, _, _, info = client.step(
+                    sessions[mode],
+                    action=None,
+                    cwnd=cwnd_val,
                 )
 
             else:
                 _, _, _, info = client.step(
-                    sessions[mode], action=None, cwnd=None,
+                    sessions[mode],
+                    action=None,
+                    cwnd=None,
                 )
 
-            states[mode] = make_state(info)
+            if "no_aoi" in mode:
+                states[mode] = make_state_no_aoi(info)
+            else:
+                states[mode] = make_state(info)
+
             results[mode]["throughput"].append(info.get("throughput", 0))
             results[mode]["aoi"].append(info.get("aoi", 0))
             results[mode]["loss_rate"].append(info.get("loss_rate", 0))
@@ -141,7 +202,9 @@ def compare(steps: int = STEPS) -> None:
             print(
                 f"Step {i + 1:3d} | "
                 f"DQN: {tp['dqn']:5.2f} | "
+                f"DQN-noAoI: {tp['dqn_no_aoi']:5.2f} | "
                 f"DDPG: {tp['ddpg']:5.2f} | "
+                f"DDPG-noAoI: {tp['ddpg_no_aoi']:5.2f} | "
                 f"Reno: {tp['reno']:5.2f} | "
                 f"Cubic: {tp['cubic']:5.2f}"
             )
@@ -160,18 +223,31 @@ def plot(results: dict, steps: int, timestamp: str) -> None:
     os.makedirs("image", exist_ok=True)
 
     colors = {
-        "dqn":   "#E57373",   # 淡紅
-        "ddpg":  "#FFB74D",   # 淡橙
-        "reno":  "#64B5F6",   # 淡藍
-        "cubic": "#BA68C8",   # 淡紫
+        "dqn":          "#E57373",   # 紅
+        "dqn_no_aoi":   "#81C784",   # 綠
+        "ddpg":         "#FFB74D",   # 橙
+        "ddpg_no_aoi":  "#64B5F6",   # 藍
+        "reno":         "#BA68C8",   # 紫
+        "cubic":        "#A1887F",   # 棕
     }
     labels = {
-        "dqn":   "DQN",
-        "ddpg":  "DDPG",
-        "reno":  "Reno",
-        "cubic": "Cubic",
+        "dqn":          "DQN",
+        "dqn_no_aoi":   "DQN (No AoI)",
+        "ddpg":         "DDPG",
+        "ddpg_no_aoi":  "DDPG (No AoI)",
+        "reno":         "Reno",
+        "cubic":        "Cubic",
     }
-    plot_modes = ["dqn", "ddpg", "reno", "cubic"]
+    linestyles = {
+        "dqn":          "-",
+        "dqn_no_aoi":   "-",
+        "ddpg":         "-",
+        "ddpg_no_aoi":  "-",
+        "reno":         "-",
+        "cubic":        "-",
+    }
+
+    plot_modes = ["dqn", "dqn_no_aoi", "ddpg", "ddpg_no_aoi", "reno", "cubic"]
 
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
     fig.suptitle("TCP Congestion Control Comparison", fontsize=15)
@@ -191,6 +267,7 @@ def plot(results: dict, steps: int, timestamp: str) -> None:
                 results[mode][key],
                 label=labels[mode],
                 color=colors[mode],
+                linestyle=linestyles[mode],
                 linewidth=2.0,
                 alpha=0.9,
             )

@@ -1,12 +1,13 @@
 """
-train_dqn.py — DQN 訓練主程式
+train_dqn_no_aoi.py — DQN 訓練主程式（無 AoI 消融版）
 
 用法：
   1. 先啟動 server：python env_server.py
-  2. 再執行：       python train.py  → 選擇 dqn
+  2. 再執行：       python train.py  → 選擇 dqn_no_aoi
 
-State（5維）：[cwnd, throughput, aoi, loss_rate, queue]
+State（4維，拿掉 aoi）：[cwnd, throughput, loss_rate, queue]
 Action：0=減少 / 1=不變 / 2=增加 cwnd（離散）
+Reward：throughput - 0.1 * rtt - 5 * loss_rate（aoi_request=None，環境不含 aoi 項）
 """
 
 import os
@@ -26,17 +27,18 @@ SEED        = 42
 # ── 正規化上限 ──
 MAX_CWND       = 100.0
 MAX_THROUGHPUT = 80.0
-MAX_AOI        = 30.0
 MAX_QUEUE      = 300.0
+
+# DQN 輸入維度（無 AoI）
+STATE_DIM_NO_AOI = 4
 
 
 def make_state(info: dict) -> np.ndarray:
-    """把 info 組成正規化 5 維 state。"""
+    """把 info 組成正規化 4 維 state（不含 aoi）。"""
     return np.array(
         [
             info["cwnd"]       / MAX_CWND,
             info["throughput"] / MAX_THROUGHPUT,
-            info["aoi"]        / MAX_AOI,
             info["loss_rate"],
             info["queue"]      / MAX_QUEUE,
         ],
@@ -45,13 +47,13 @@ def make_state(info: dict) -> np.ndarray:
 
 
 def make_init_state() -> np.ndarray:
-    """reset 時尚無 info，用初始值。"""
-    return np.array([0.1, 0.0, 0.0, 0.0, 0.0], dtype=np.float32)
+    """reset 時尚無 info，用初始值（4維）。"""
+    return np.array([0.1, 0.0, 0.0, 0.0], dtype=np.float32)
 
 
-def train_dqn() -> tuple[DQNAgent, dict]:
+def train_dqn_no_aoi() -> tuple[DQNAgent, dict]:
     client = TCPEnvClient()
-    agent  = DQNAgent()
+    agent  = DQNAgent(state_dim=STATE_DIM_NO_AOI)
 
     history: dict[str, list] = {
         "reward":     [],
@@ -84,7 +86,7 @@ def train_dqn() -> tuple[DQNAgent, dict]:
                 session_id,
                 action=action,
                 cwnd=None,
-                aoi_request=1,
+                # aoi_request 不傳 → 預設 None → reward 不含 aoi
             )
 
             next_state = make_state(info)
@@ -95,7 +97,7 @@ def train_dqn() -> tuple[DQNAgent, dict]:
             state      = next_state
             ep_reward += reward
             ep_info["throughput"].append(info["throughput"])
-            ep_info["aoi"].append(info["aoi"])
+            ep_info["aoi"].append(info["aoi"])  # 仍記錄 aoi 供觀察
             ep_info["loss"].append(info["loss_rate"])
 
             if q_loss is not None:
@@ -114,7 +116,7 @@ def train_dqn() -> tuple[DQNAgent, dict]:
 
         if ep % EVAL_EVERY == 0:
             print(
-                f"[DQN] Episode {ep:4d} | "
+                f"[DQN-noAoI] Episode {ep:4d} | "
                 f"Reward {ep_reward:8.2f} | "
                 f"Throughput {history['throughput'][-1]:5.1f} | "
                 f"AoI {history['aoi'][-1]:5.2f} | "
@@ -124,11 +126,11 @@ def train_dqn() -> tuple[DQNAgent, dict]:
             )
 
     client.close()
-    agent.save("dqn_agent.pth")
+    agent.save("dqn_no_aoi.pth")
     return agent, history
 
 
-def plot_dqn(history: dict) -> None:
+def plot_dqn_no_aoi(history: dict) -> None:
     os.makedirs("image", exist_ok=True)
 
     episodes = range(1, len(history["reward"]) + 1)
@@ -143,7 +145,7 @@ def plot_dqn(history: dict) -> None:
     ]
 
     fig, axes = plt.subplots(2, 3, figsize=(16, 8))
-    fig.suptitle("DQN Agent Training", fontsize=14)
+    fig.suptitle("DQN Agent Training (No AoI)", fontsize=14)
 
     for ax, (key, title, color) in zip(axes.flatten(), configs):
         ax.plot(episodes, history[key], color=color)
@@ -153,7 +155,7 @@ def plot_dqn(history: dict) -> None:
 
     plt.tight_layout()
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    path = f"image/dqn_training_{timestamp}.png"
+    path = f"image/dqn_no_aoi_training_{timestamp}.png"
     plt.savefig(path, dpi=150)
     print(f"圖表已儲存：{path}")
     plt.show()

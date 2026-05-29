@@ -6,24 +6,35 @@ train.py — 訓練模式選擇入口
   2. 再執行：       python train.py
 """
 
-from train import train_dqn, plot_dqn
-from train import train_ddpg, plot_ddpg
+from train.train_dqn         import train_dqn,         plot_dqn
+from train.train_ddpg        import train_ddpg,         plot_ddpg
+from train.train_dqn_no_aoi  import train_dqn_no_aoi,  plot_dqn_no_aoi
+from train.train_ddpg_no_aoi import train_ddpg_no_aoi, plot_ddpg_no_aoi
 
 MODES = {
-    "dqn":  (train_dqn,  plot_dqn),
-    "ddpg": (train_ddpg, plot_ddpg),
+    "dqn":         (train_dqn,         plot_dqn),
+    "ddpg":        (train_ddpg,        plot_ddpg),
+    "dqn_no_aoi":  (train_dqn_no_aoi,  plot_dqn_no_aoi),
+    "ddpg_no_aoi": (train_ddpg_no_aoi, plot_ddpg_no_aoi),
 }
 
 if __name__ == "__main__":
     available = ", ".join(MODES.keys())
-    print(f"可用的訓練模式：{available}")
 
     while True:
-        mode = input("請輸入模式名稱：").strip().lower()
-        if mode in MODES:
-            break
-        print(f"未知模式「{mode}」，請重新輸入。")
+        print(f"\n可用的訓練模式：{available}")
+        print("輸入 q 離開")
 
-    train_fn, plot_fn = MODES[mode]
-    agent, history = train_fn()
-    plot_fn(history)
+        mode = input("請輸入模式名稱：").strip().lower()
+
+        if mode == "q":
+            print("結束訓練。")
+            break
+
+        if mode not in MODES:
+            print(f"未知模式「{mode}」，請重新輸入。")
+            continue
+
+        train_fn, plot_fn = MODES[mode]
+        agent, history = train_fn()
+        plot_fn(history)

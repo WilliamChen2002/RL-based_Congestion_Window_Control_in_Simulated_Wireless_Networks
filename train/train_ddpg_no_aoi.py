@@ -1,12 +1,13 @@
 """
-train_ddpg.py — DDPG 訓練主程式
+train_ddpg_no_aoi.py — DDPG 訓練主程式（無 AoI 消融版）
 
 用法：
   1. 先啟動 server：python env_server.py
-  2. 再執行：       python train.py  → 選擇 ddpg
+  2. 再執行：       python train.py  → 選擇 ddpg_no_aoi
 
-State（5維）：[cwnd, throughput, aoi, loss_rate, queue]
+State（4維，拿掉 aoi）：[cwnd, throughput, loss_rate, queue]
 Action：目標 cwnd 值，範圍 [1.0, 100.0]（連續）
+Reward：throughput - 0.1 * rtt - 5 * loss_rate（aoi_request=None，環境不含 aoi 項）
 """
 
 import os
@@ -26,17 +27,18 @@ SEED        = 42
 # ── 正規化上限 ──
 MAX_CWND       = 100.0
 MAX_THROUGHPUT = 80.0
-MAX_AOI        = 30.0
 MAX_QUEUE      = 300.0
+
+# DDPG 輸入維度（無 AoI）
+STATE_DIM_NO_AOI = 4
 
 
 def make_state(info: dict) -> np.ndarray:
-    """把 info 組成正規化 5 維 state。"""
+    """把 info 組成正規化 4 維 state（不含 aoi）。"""
     return np.array(
         [
             info["cwnd"]       / MAX_CWND,
             info["throughput"] / MAX_THROUGHPUT,
-            info["aoi"]        / MAX_AOI,
             info["loss_rate"],
             info["queue"]      / MAX_QUEUE,
         ],
@@ -45,13 +47,13 @@ def make_state(info: dict) -> np.ndarray:
 
 
 def make_init_state() -> np.ndarray:
-    """reset 時尚無 info，用初始值。"""
-    return np.array([0.1, 0.0, 0.0, 0.0, 0.0], dtype=np.float32)
+    """reset 時尚無 info，用初始值（4維）。"""
+    return np.array([0.1, 0.0, 0.0, 0.0], dtype=np.float32)
 
 
-def train_ddpg() -> tuple[DDPGAgent, dict]:
+def train_ddpg_no_aoi() -> tuple[DDPGAgent, dict]:
     client = TCPEnvClient()
-    agent  = DDPGAgent()
+    agent  = DDPGAgent(state_dim=STATE_DIM_NO_AOI)
 
     history: dict[str, list] = {
         "reward":      [],
@@ -89,7 +91,7 @@ def train_ddpg() -> tuple[DDPGAgent, dict]:
                 session_id,
                 action=None,
                 cwnd=cwnd_val,
-                aoi_request=1,
+                # aoi_request 不傳 → 預設 None → reward 不含 aoi
             )
 
             next_state = make_state(info)
@@ -100,7 +102,7 @@ def train_ddpg() -> tuple[DDPGAgent, dict]:
             state      = next_state
             ep_reward += reward
             ep_info["throughput"].append(info["throughput"])
-            ep_info["aoi"].append(info["aoi"])
+            ep_info["aoi"].append(info["aoi"])  # 仍記錄 aoi 供觀察
             ep_info["loss"].append(info["loss_rate"])
             ep_info["cwnd"].append(info["cwnd"])
 
@@ -127,7 +129,7 @@ def train_ddpg() -> tuple[DDPGAgent, dict]:
             a_loss = history["actor_loss"][-1]
             c_loss = history["critic_loss"][-1]
             print(
-                f"[DDPG] Episode {ep:4d} | "
+                f"[DDPG-noAoI] Episode {ep:4d} | "
                 f"Reward {ep_reward:8.2f} | "
                 f"Throughput {history['throughput'][-1]:5.1f} | "
                 f"AoI {history['aoi'][-1]:5.2f} | "
@@ -138,11 +140,11 @@ def train_ddpg() -> tuple[DDPGAgent, dict]:
             )
 
     client.close()
-    agent.save("ddpg_agent.pth")
+    agent.save("ddpg_no_aoi.pth")
     return agent, history
 
 
-def plot_ddpg(history: dict) -> None:
+def plot_ddpg_no_aoi(history: dict) -> None:
     os.makedirs("image", exist_ok=True)
 
     episodes = range(1, len(history["reward"]) + 1)
@@ -159,7 +161,7 @@ def plot_ddpg(history: dict) -> None:
     ]
 
     fig, axes = plt.subplots(3, 3, figsize=(18, 12))
-    fig.suptitle("DDPG Agent Training", fontsize=14)
+    fig.suptitle("DDPG Agent Training (No AoI)", fontsize=14)
 
     for ax, (key, title, color) in zip(axes.flatten(), configs):
         ax.plot(episodes, history[key], color=color)
@@ -171,7 +173,7 @@ def plot_ddpg(history: dict) -> None:
 
     plt.tight_layout()
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    path = f"image/ddpg_training_{timestamp}.png"
+    path = f"image/ddpg_no_aoi_training_{timestamp}.png"
     plt.savefig(path, dpi=150)
     print(f"圖表已儲存：{path}")
     plt.show()
