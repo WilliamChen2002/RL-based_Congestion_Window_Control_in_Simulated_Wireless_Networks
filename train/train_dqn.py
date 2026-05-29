@@ -124,7 +124,8 @@ def train_dqn() -> tuple[DQNAgent, dict]:
             )
 
     client.close()
-    agent.save("dqn_agent.pth")
+    os.makedirs("model", exist_ok=True)
+    agent.save("model/dqn_agent.pth")
     return agent, history
 
 

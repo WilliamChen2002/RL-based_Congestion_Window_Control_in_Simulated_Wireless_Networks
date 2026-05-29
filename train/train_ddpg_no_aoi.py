@@ -140,7 +140,8 @@ def train_ddpg_no_aoi() -> tuple[DDPGAgent, dict]:
             )
 
     client.close()
-    agent.save("ddpg_no_aoi.pth")
+    os.makedirs("model", exist_ok=True)
+    agent.save("model/ddpg_no_aoi.pth")
     return agent, history
 
 

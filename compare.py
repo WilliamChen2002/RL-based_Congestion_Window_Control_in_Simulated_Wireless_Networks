@@ -18,10 +18,10 @@ from client import TCPEnvClient
 
 # ── 設定 ──
 STEPS            = 150
-DQN_MODEL_PATH         = "dqn_agent.pth"
-DDPG_MODEL_PATH        = "ddpg_agent.pth"
-DQN_NO_AOI_MODEL_PATH  = "dqn_no_aoi.pth"
-DDPG_NO_AOI_MODEL_PATH = "ddpg_no_aoi.pth"
+DQN_MODEL_PATH         = "model/dqn_agent.pth"
+DDPG_MODEL_PATH        = "model/ddpg_agent.pth"
+DQN_NO_AOI_MODEL_PATH  = "model/dqn_no_aoi.pth"
+DDPG_NO_AOI_MODEL_PATH = "model/ddpg_no_aoi.pth"
 
 # ── 正規化上限 ──
 MAX_CWND       = 100.0

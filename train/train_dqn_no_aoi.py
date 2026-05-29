@@ -126,12 +126,13 @@ def train_dqn_no_aoi() -> tuple[DQNAgent, dict]:
             )
 
     client.close()
-    agent.save("dqn_no_aoi.pth")
+    os.makedirs("model", exist_ok=True)
+    agent.save("model/dqn_no_aoi.pth")
     return agent, history
 
 
 def plot_dqn_no_aoi(history: dict) -> None:
-    os.makedirs("image", exist_ok=True)
+    os.makedirs("figures", exist_ok=True)
 
     episodes = range(1, len(history["reward"]) + 1)
 
@@ -155,7 +156,7 @@ def plot_dqn_no_aoi(history: dict) -> None:
 
     plt.tight_layout()
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    path = f"image/dqn_no_aoi_training_{timestamp}.png"
+    path = f"figures/dqn_no_aoi_training_{timestamp}.png"
     plt.savefig(path, dpi=150)
     print(f"圖表已儲存：{path}")
     plt.show()

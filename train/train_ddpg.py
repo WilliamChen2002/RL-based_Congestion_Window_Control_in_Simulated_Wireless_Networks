@@ -138,7 +138,8 @@ def train_ddpg() -> tuple[DDPGAgent, dict]:
             )
 
     client.close()
-    agent.save("ddpg_agent.pth")
+    os.makedirs("model", exist_ok=True)
+    agent.save("model/ddpg_agent.pth")
     return agent, history
 
 

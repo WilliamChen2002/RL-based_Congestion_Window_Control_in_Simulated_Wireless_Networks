@@ -335,10 +335,10 @@ python compare.py
 
 | 檔案 | 說明 |
 |------|------|
-| dqn_agent.pth | DQN 模型權重（不進 git） |
-| ddpg_agent.pth | DDPG 模型權重（不進 git） |
-| dqn_no_aoi.pth | DQN 無 AoI 模型權重（不進 git） |
-| ddpg_no_aoi.pth | DDPG 無 AoI 模型權重（不進 git） |
+| model/dqn_agent.pth | DQN 模型權重 |
+| model/ddpg_agent.pth | DDPG 模型權重 |
+| model/dqn_no_aoi.pth | DQN 無 AoI 模型權重 |
+| model/ddpg_no_aoi.pth | DDPG 無 AoI 模型權重 |
 | image/dqn_training_*.png | DQN 訓練曲線 |
 | image/ddpg_training_*.png | DDPG 訓練曲線 |
 | image/dqn_no_aoi_training_*.png | DQN 無 AoI 訓練曲線 |
