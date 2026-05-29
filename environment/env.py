@@ -46,7 +46,7 @@ class TCPEnv:
             dtype=np.float32,
         )
 
-    def step(self, action=None, cwnd=None):
+    def step(self, action=None, cwnd=None, aoi_request=None):
 
         self.time += 1
         self.step_count += 1
@@ -70,8 +70,10 @@ class TCPEnv:
             self.sender.on_loss()
         else:
             self.sender.on_ack(ack)
-
-        reward = throughput - 0.1 * rtt - 5 * loss_rate - 0.5 * aoi
+        if aoi_request is not None:
+            reward = throughput - 0.1 * rtt - 5 * loss_rate - 0.5 * aoi
+        else:
+            reward = throughput - 0.1 * rtt - 5 * loss_rate
 
         terminated = False
         truncated = self.step_count >= self.max_steps

@@ -41,7 +41,7 @@ class TCPEnvClient:
         res = self._recv()
         return res["state"]
 
-    def step(self, session_id, action, cwnd):
+    def step(self, session_id, action, cwnd, aoi_request=None):
         """
         RL standard interface:
 
@@ -55,6 +55,7 @@ class TCPEnvClient:
                 "session_id": session_id,
                 "action": action,
                 "cwnd": cwnd,
+                "aoi_request": aoi_request,
             }
         )
 
@@ -258,7 +259,7 @@ def agent_read_status():
 if __name__ == "__main__":
     steps = 150
 
-    results = run_experiment(steps)
+    results = run_experiment(steps, aoi_request=1)
 
     plot_results(results, steps)
 

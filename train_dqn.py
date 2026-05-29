@@ -35,11 +35,11 @@ def make_state(info: dict) -> np.ndarray:
     """把 info 組成正規化 5 維 state。"""
     return np.array(
         [
-            info["cwnd"]       / MAX_CWND,
+            info["cwnd"] / MAX_CWND,
             info["throughput"] / MAX_THROUGHPUT,
-            info["aoi"]        / MAX_AOI,
+            info["aoi"] / MAX_AOI,
             info["loss_rate"],
-            info["queue"]      / MAX_QUEUE,
+            info["queue"] / MAX_QUEUE,
         ],
         dtype=np.float32,
     ).clip(0.0, 1.0)
@@ -85,6 +85,7 @@ def train() -> tuple[DQNAgent, dict]:
                 session_id,
                 action=action,
                 cwnd=None,
+                aoi_request=1,
             )
 
             next_state = make_state(info)
@@ -118,7 +119,7 @@ def train() -> tuple[DQNAgent, dict]:
                 f"Reward {ep_reward:8.2f} | "
                 f"Throughput {history['throughput'][-1]:5.1f} | "
                 f"AoI {history['aoi'][-1]:5.2f} | "
-                f"Loss {history['loss'][-1]*100:4.1f}% | "
+                f"Loss {history['loss'][-1] * 100:4.1f}% | "
                 f"ε {agent.eps:.3f} | "
                 f"Q_loss {history['q_loss'][-1]:.4f}"
             )
@@ -130,6 +131,7 @@ def train() -> tuple[DQNAgent, dict]:
 
 def plot(history: dict) -> None:
     import os
+
     os.makedirs("image", exist_ok=True)
 
     fig, axes = plt.subplots(2, 3, figsize=(16, 8))
@@ -143,12 +145,12 @@ def plot(history: dict) -> None:
         return np.convolve(x, np.ones(w) / w, mode="valid")
 
     configs = [
-        (axes[0, 0], history["reward"],     "Episode Reward",    "steelblue"),
+        (axes[0, 0], history["reward"], "Episode Reward", "steelblue"),
         (axes[0, 1], history["throughput"], "Throughput (pkts)", "darkorange"),
-        (axes[0, 2], history["q_loss"],     "Q Loss",            "tomato"),
-        (axes[1, 0], history["aoi"],        "AoI",               "crimson"),
-        (axes[1, 1], history["loss"],       "Packet Loss Rate",  "purple"),
-        (axes[1, 2], history["eps"],        "Epsilon",           "gray"),
+        (axes[0, 2], history["q_loss"], "Q Loss", "tomato"),
+        (axes[1, 0], history["aoi"], "AoI", "crimson"),
+        (axes[1, 1], history["loss"], "Packet Loss Rate", "purple"),
+        (axes[1, 2], history["eps"], "Epsilon", "gray"),
     ]
 
     for ax, data, title, color in configs:

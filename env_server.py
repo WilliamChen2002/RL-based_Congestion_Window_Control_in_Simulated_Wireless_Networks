@@ -68,15 +68,18 @@ async def handle_client(reader, writer):
                 session_id = request.get("session_id")
                 action = request.get("action")
                 cwnd = request.get("cwnd")  # DDPG 用，直接設定目標 cwnd
+                aoi_request = request.get("aoi_request")
 
                 env = sessions.get(session_id)
 
                 if env:
-                    # DDPG 傳來的 cwnd 直接設定到 sender，再讓環境跑一步
-                    if cwnd is not None:
-                        env.sender.cwnd = float(cwnd)
+                    # # DDPG 傳來的 cwnd 直接設定到 sender，再讓環境跑一步
+                    # if cwnd is not None:
+                    #     env.sender.cwnd = float(cwnd)
 
-                    state, reward, terminated, truncated, info = env.step(action)
+                    state, reward, terminated, truncated, info = env.step(
+                        action, cwnd, aoi_request
+                    )
 
                     response = {
                         "status": "ok",
