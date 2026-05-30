@@ -56,10 +56,10 @@ RL_FinalProject/
 
 ```
 train.py（互動式入口，輸入 q 離開）
-  → train/train_dqn.py         → 儲存 dqn_agent.pth
-  → train/train_ddpg.py        → 儲存 ddpg_agent.pth
-  → train/train_dqn_no_aoi.py  → 儲存 dqn_no_aoi.pth
-  → train/train_ddpg_no_aoi.py → 儲存 ddpg_no_aoi.pth
+  → train/train_dqn.py         → 儲存 model/dqn_agent.pth
+  → train/train_ddpg.py        → 儲存 model/ddpg_agent.pth
+  → train/train_dqn_no_aoi.py  → 儲存 model/dqn_no_aoi.pth
+  → train/train_ddpg_no_aoi.py → 儲存 model/ddpg_no_aoi.pth
 ```
 
 **展示比較階段：** 透過 socket 與 env_server 溝通，六模式同時跑，公平比較。
