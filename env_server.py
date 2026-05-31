@@ -73,10 +73,6 @@ async def handle_client(reader, writer):
                 env = sessions.get(session_id)
 
                 if env:
-                    # # DDPG 傳來的 cwnd 直接設定到 sender，再讓環境跑一步
-                    # if cwnd is not None:
-                    #     env.sender.cwnd = float(cwnd)
-
                     state, reward, terminated, truncated, info = env.step(
                         action, cwnd, aoi_request
                     )
@@ -107,9 +103,9 @@ async def handle_client(reader, writer):
 
 async def main():
 
-    server = await asyncio.start_server(handle_client, "127.0.0.1", 8888)
+    server = await asyncio.start_server(handle_client, "0.0.0.0", 8888)
 
-    print("TCP RL Env Server running (stable schema enabled)")
+    print("Environment Server Start.")
 
     async with server:
         await server.serve_forever()
