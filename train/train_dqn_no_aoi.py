@@ -21,13 +21,13 @@ from train.agent import DQNAgent
 
 # ── 訓練設定 ──
 N_EPISODES = 1000
-EVAL_EVERY  = 50
-SEED        = 42
+EVAL_EVERY = 50
+SEED = 42
 
 # ── 正規化上限 ──
-MAX_CWND       = 100.0
+MAX_CWND = 100.0
 MAX_THROUGHPUT = 80.0
-MAX_QUEUE      = 300.0
+MAX_QUEUE = 300.0
 
 # DQN 輸入維度（無 AoI）
 STATE_DIM_NO_AOI = 4
@@ -37,10 +37,10 @@ def make_state(info: dict) -> np.ndarray:
     """把 info 組成正規化 4 維 state（不含 aoi）。"""
     return np.array(
         [
-            info["cwnd"]       / MAX_CWND,
+            info["cwnd"] / MAX_CWND,
             info["throughput"] / MAX_THROUGHPUT,
             info["loss_rate"],
-            info["queue"]      / MAX_QUEUE,
+            info["queue"] / MAX_QUEUE,
         ],
         dtype=np.float32,
     ).clip(0.0, 1.0)
@@ -53,30 +53,30 @@ def make_init_state() -> np.ndarray:
 
 def train_dqn_no_aoi() -> tuple[DQNAgent, dict]:
     client = TCPEnvClient()
-    agent  = DQNAgent(state_dim=STATE_DIM_NO_AOI)
+    agent = DQNAgent(state_dim=STATE_DIM_NO_AOI)
 
     history: dict[str, list] = {
-        "reward":     [],
+        "reward": [],
         "throughput": [],
-        "aoi":        [],
-        "loss":       [],
-        "eps":        [],
-        "q_loss":     [],
+        "aoi": [],
+        "loss": [],
+        "eps": [],
+        "q_loss": [],
     }
 
     for ep in range(1, N_EPISODES + 1):
-        resp       = client.create(mode="agent", seed=SEED if ep == 1 else ep)
+        resp = client.create(mode="agent", seed=SEED if ep == 1 else ep)
         session_id = resp["session_id"]
         client.reset(session_id)
 
-        state     = make_init_state()
-        done      = False
+        state = make_init_state()
+        done = False
         ep_reward = 0.0
         ep_info: dict[str, list] = {
             "throughput": [],
-            "aoi":        [],
-            "loss":       [],
-            "q_loss":     [],
+            "aoi": [],
+            "loss": [],
+            "q_loss": [],
         }
 
         while not done:
@@ -94,7 +94,7 @@ def train_dqn_no_aoi() -> tuple[DQNAgent, dict]:
             agent.store(state, action, reward, next_state, done)
             q_loss = agent.train_step()
 
-            state      = next_state
+            state = next_state
             ep_reward += reward
             ep_info["throughput"].append(info["throughput"])
             ep_info["aoi"].append(info["aoi"])  # 仍記錄 aoi 供觀察
@@ -120,7 +120,7 @@ def train_dqn_no_aoi() -> tuple[DQNAgent, dict]:
                 f"Reward {ep_reward:8.2f} | "
                 f"Throughput {history['throughput'][-1]:5.1f} | "
                 f"AoI {history['aoi'][-1]:5.2f} | "
-                f"Loss {history['loss'][-1]*100:4.1f}% | "
+                f"Loss {history['loss'][-1] * 100:4.1f}% | "
                 f"ε {agent.eps:.3f} | "
                 f"Q_loss {history['q_loss'][-1]:.4f}"
             )
@@ -137,18 +137,18 @@ def plot_dqn_no_aoi(history: dict) -> None:
     episodes = range(1, len(history["reward"]) + 1)
 
     configs = [
-        ("reward",     "Episode Reward",    "steelblue"),
+        ("reward", "Episode Reward", "steelblue"),
         ("throughput", "Throughput (pkts)", "darkorange"),
-        ("q_loss",     "Q Loss",            "tomato"),
-        ("aoi",        "AoI",               "crimson"),
-        ("loss",       "Packet Loss Rate",  "purple"),
-        ("eps",        "Epsilon",           "gray"),
+        ("q_loss", "Q Loss", "tomato"),
+        ("aoi", "AoI", "crimson"),
+        ("loss", "Packet Loss Rate", "purple"),
+        ("eps", "Epsilon", "gray"),
     ]
 
     fig, axes = plt.subplots(2, 3, figsize=(16, 8))
     fig.suptitle("DQN Agent Training (No AoI)", fontsize=14)
 
-    for ax, (key, title, color) in zip(axes.flatten(), configs):
+    for ax, (key, title, color) in zip(axes.flatten(), configs, strict=False):
         ax.plot(episodes, history[key], color=color)
         ax.set_title(title)
         ax.set_xlabel("Episode")

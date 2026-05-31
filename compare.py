@@ -13,8 +13,8 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 import numpy as np
 
-from train.agent import DDPGAgent, DQNAgent
 from client import TCPEnvClient
+from train.agent import DDPGAgent, DQNAgent
 
 # ── 設定 ──
 STEPS            = 150

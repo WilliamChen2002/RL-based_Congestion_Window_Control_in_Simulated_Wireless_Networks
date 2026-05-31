@@ -6,10 +6,10 @@ train.py — 訓練模式選擇入口
   2. 再執行：       python train.py
 """
 
-from train.train_dqn         import train_dqn,         plot_dqn
-from train.train_ddpg        import train_ddpg,         plot_ddpg
-from train.train_dqn_no_aoi  import train_dqn_no_aoi,  plot_dqn_no_aoi
-from train.train_ddpg_no_aoi import train_ddpg_no_aoi, plot_ddpg_no_aoi
+from train.train_ddpg import plot_ddpg, train_ddpg
+from train.train_ddpg_no_aoi import plot_ddpg_no_aoi, train_ddpg_no_aoi
+from train.train_dqn import plot_dqn, train_dqn
+from train.train_dqn_no_aoi import plot_dqn_no_aoi, train_dqn_no_aoi
 
 MODES = {
     "dqn":         (train_dqn,         plot_dqn),
